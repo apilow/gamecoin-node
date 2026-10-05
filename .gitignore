@@ -1,0 +1,19 @@
+# Dependencies and build output
+node_modules/
+dist/
+.test-build/
+*.tgz
+
+# Secrets and local configuration: never commit a key
+.env
+.env.*
+!.env.example
+
+# Logs, tools, editors, OS
+npm-debug.log*
+coverage/
+.nyc_output/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
