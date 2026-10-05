@@ -29,6 +29,8 @@ export const ErrorCode = Object.freeze({
   CONFLICT: "CONFLICT",
   /** 429: too many requests (`retryAfter`). */
   RATE_LIMITED: "RATE_LIMITED",
+  /** Studio suspended (HTTP 423). Not returned by the server API today; listed for parity with the other SDKs. */
+  READ_ONLY: "READ_ONLY",
   /** 500: unexpected error on the GameCoin side. */
   INTERNAL: "INTERNAL",
   /** SDK, status 0: no answer (connection refused, DNS failure, reset…). */

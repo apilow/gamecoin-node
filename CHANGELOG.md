@@ -10,6 +10,9 @@ First release: the server SDK of the GameCoin API v1.
 
 ### Added
 
+- Redirects are never followed (`redirect: "manual"`): a `3xx` is raised as `INVALID_RESPONSE` with its status.
+- `ErrorCode.READ_ONLY`, for parity with the other GameCoin server SDKs.
+
 - `GameCoin` client with the resources `catalog`, `players`, `wallet`, `ledger`, `inventory`, `purchases`,
   `checkouts` and `orders`, covering the whole server API.
 - `ext()` helper for players identified by your own id; references are URL-encoded exactly once.

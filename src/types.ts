@@ -249,6 +249,8 @@ export interface FetchRequestInit {
   headers: Record<string, string>;
   body?: string;
   signal: AbortSignal;
+  /** Always `"manual"`: the SDK never follows a redirect (a redirected POST could be replayed as a GET). */
+  redirect: "manual";
 }
 
 /** Minimal response the SDK needs from the transport. The global `fetch` of Node 18+ fits. */

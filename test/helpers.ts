@@ -13,6 +13,7 @@ export interface RecordedCall {
   /** The JSON body, `undefined` when none was sent. */
   body: unknown;
   signal: AbortSignal;
+  redirect: string;
 }
 
 export interface Reply {
@@ -38,7 +39,7 @@ export function fakeFetch(script: Script | Script[]): { fetch: FetchFunction; ca
   const calls: RecordedCall[] = [];
   const fetch: FetchFunction = async (url: string, init: FetchRequestInit) => {
     const headers = Object.fromEntries(Object.entries(init.headers).map(([name, value]) => [name.toLowerCase(), value]));
-    const call: RecordedCall = { url, method: init.method, headers, body: init.body === undefined ? undefined : JSON.parse(init.body), signal: init.signal };
+    const call: RecordedCall = { url, method: init.method, headers, body: init.body === undefined ? undefined : JSON.parse(init.body), signal: init.signal, redirect: init.redirect };
     const index = calls.length;
     calls.push(call);
     const entry = scripts[Math.min(index, scripts.length - 1)];

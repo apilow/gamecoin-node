@@ -298,6 +298,7 @@ describe("unusable responses", () => {
       "PAYMENT_FAILED",
       "PLAYER_BLOCKED",
       "RATE_LIMITED",
+      "READ_ONLY",
       "TIMEOUT",
       "UNAUTHENTICATED",
       "VALIDATION_FAILED",

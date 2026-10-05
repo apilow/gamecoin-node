@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { inspect } from "node:util";
-import { DEFAULT_BASE_URL, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, GameCoin, VERSION } from "../src/index.js";
+import { DEFAULT_BASE_URL, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, GameCoin, GameCoinError, VERSION } from "../src/index.js";
 import { LIVE_KEY, TEST_KEY, fakeFetch, harness, movementJson } from "./helpers.js";
 
 describe("client: authentication, headers, configuration", () => {
@@ -16,6 +16,18 @@ describe("client: authentication, headers, configuration", () => {
     assert.equal(call.method, "GET");
     assert.equal(call.url, "https://gamecoin.test/api/v1/catalog");
     assert.equal(call.headers["content-type"], undefined, "no body, no content type");
+  });
+
+  it("never follows a redirect: a 3xx is an error, not retried", async () => {
+    const { gamecoin, calls } = harness({ status: 302, text: "<html>moved</html>", headers: { location: "https://elsewhere.test/", "content-type": "text/html" } });
+    await assert.rejects(gamecoin.wallet.grant("p1", { currency: "gems", amount: 1 }), (error: unknown) => {
+      assert.ok(GameCoinError.isGameCoinError(error));
+      assert.equal(error.code, "INVALID_RESPONSE");
+      assert.equal(error.status, 302);
+      return true;
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.redirect, "manual");
   });
 
   it("sets Content-Type: application/json when there is a body", async () => {

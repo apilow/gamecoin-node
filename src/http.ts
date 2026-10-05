@@ -179,7 +179,7 @@ export class HttpClient {
     });
     try {
       const exchange = async () => {
-        const response = await config.fetch(url, { method, headers, ...(body !== undefined ? { body } : {}), signal: controller.signal });
+        const response = await config.fetch(url, { method, headers, ...(body !== undefined ? { body } : {}), signal: controller.signal, redirect: "manual" });
         return { type: "response" as const, status: response.status, headers: response.headers, text: await response.text() };
       };
       return await Promise.race([exchange(), aborted]);

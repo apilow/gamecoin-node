@@ -55,7 +55,7 @@ new GameCoin(secretKey: string, options?: GameCoinOptions)
 |---|---|---|
 | `baseUrl` | `https://gamecoin.apilow.com` | Where the API runs. The SDK appends `/api/v1`. |
 | `timeout` | `30000` | Milliseconds to wait for one attempt (headers and body). |
-| `maxRetries` | `2` | Retries after the first attempt, so three attempts by default. `0` turns retries off. |
+| `maxRetries` | `2` | Retries after the first attempt, so three attempts by default. From `0` (no retry) to `10`. |
 | `fetch` | global `fetch` | Your own transport, for tests or a proxy. |
 | `sleep` | a timer | Your own wait between retries, for tests. |
 
