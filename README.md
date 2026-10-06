@@ -3,7 +3,7 @@
 Server SDK for [Apilow GameCoin](https://gamecoin.apilow.com), the bank of your game: it keeps the virtual currency,
 the inventory and the sales of your web or mobile game. Use it from your game backend, with a **secret key**.
 
-- Whole server API: catalog, players, wallet, ledger, inventory, purchases, checkouts, orders and refunds.
+- Whole server API: catalog, players, wallet, ledger, inventory, purchases, checkouts, gift codes, orders and refunds.
 - Webhook signature verification: one pure function, no client needed.
 - Safe to retry: every state-changing call carries an idempotency key, and failures are retried for you.
 - Zero runtime dependencies (built-in `fetch`), Node 18 or later, ESM and CommonJS, TypeScript types included.
@@ -152,6 +152,20 @@ console.log(purchase.balance.total, purchase.item.quantity, purchase.entry.ref.i
 
 ## Checkout, orders and refunds
 
+`catalog.get()` lists the active currencies, items and packs. A pack has an `availability`: `null` for an ordinary pack (always
+on sale, no limit), otherwise `{ startsAt, endsAt, remaining, founder }` with the dates as `Date` or `null` and `remaining` the
+units left (`null` for an unlimited stock). The catalog also lists scheduled, ended and sold-out packs: your shop decides what
+to show. While the game is in pre-launch, `catalog.prelaunch` is `true` and `catalog.launchAt` holds the launch date.
+
+```js
+const catalog = await gamecoin.catalog.get();
+for (const pack of catalog.packs) {
+  const left = pack.availability?.remaining; // undefined: ordinary pack, null: unlimited stock
+  console.log(pack.sku, pack.priceCents, left, pack.availability?.founder ?? false);
+}
+if (catalog.prelaunch) console.log("pre-orders until", catalog.launchAt);
+```
+
 A checkout sells a currency pack for real money through a hosted payment page.
 
 ```js
@@ -161,12 +175,19 @@ const checkout = await gamecoin.checkouts.create(player, {
   cancelUrl: "https://example.com/shop",
   country: "BE", // the buyer's country decides the VAT (EU countries only)
   locale: "en", // language of the payment page, the receipt and the e-mails: "fr", "en" or "nl"
+  creatorCode: "ALICE10", // optional, a code that exists: free bonus coins for the buyer, a commission for the creator
 });
 console.log(checkout.order.status, checkout.checkoutUrl); // "pending" "https://…/pay/<order id>?t=…"
 
 const order = await gamecoin.orders.get(checkout.order.id);
 console.log(order.status, order.amountCents, order.vatCents, order.netCents);
 ```
+
+A refused `creatorCode` (unknown, disabled, not valid for the pack, or the creator's own player) is a `VALIDATION_FAILED` error
+with `error.details.fieldErrors.creatorCode` equal to `["CODE_INVALID"]`. The order keeps the code: `order.creatorCode` is
+`{ code, creatorName }` (never the creator's rates), or `null`. A pack outside its sale window is refused with
+`PACK_NOT_AVAILABLE` (`error.details.startsAt` and `error.details.endsAt`: ISO 8601 text or `null`), a pack with no unit left
+with `PACK_SOLD_OUT` (`error.details.packSku`). The window is checked when the order is created: an order created in time stays payable.
 
 In the test environment the payment page offers "Pay (simulated)" and "Decline"; real payments are not available yet.
 After payment the order becomes `fulfilled`: the coins and items are delivered.
@@ -186,6 +207,25 @@ try {
 
 A refund has no idempotency key, so it is retried on `429` only. After a network error, a timeout or a `5xx` the SDK
 raises, and you read the order back with `orders.get` before trying again.
+
+## Codes
+
+A **gift code** is issued by your studio (limited uses, one use per player, optional expiry) and typed by the player. It gives
+free coins (the `bonus` bucket) and items, never paid coins. `codes.redeem` takes the player and the code as typed: the API
+ignores case, spaces and dashes, so the SDK does not change it.
+
+```js
+const redemption = await gamecoin.codes.redeem(player, "SUMMER-2026");
+for (const { currency, amount, balance } of redemption.grants) console.log(`+${amount} ${currency}, now ${balance.total}`);
+console.log(redemption.items, redemption.skipped, redemption.replayed); // items received; items the player could not receive (maxOwned)
+```
+
+An unknown, malformed, expired, used up, disabled or already used code is always the same error, so that nothing tells a guess
+from a real code: `VALIDATION_FAILED` with `error.details.fieldErrors.code` equal to `["CODE_INVALID"]`. It is never retried.
+`PLAYER_BLOCKED`, `LIMIT_REACHED` (the player already owns the maximum of every item), `CONFLICT` (currencies or items archived
+since) and `RATE_LIMITED` come through the usual error mapping; the code is not used up in the first three cases. Like the other
+state-changing calls, `codes.redeem` sends an idempotency key: a replay returns the same result with `replayed: true` and credits
+nothing twice. Creator codes are a different thing: they go in the `creatorCode` option of `checkouts.create`.
 
 ## Webhooks
 
@@ -252,7 +292,7 @@ The event is `{ id, type, createdAt, env, data }`, with `createdAt` as a `Date` 
 
 | Constant | `type` | `data` |
 |---|---|---|
-| `ORDER_FULFILLED` | `order.fulfilled` | the `Order`, as `orders.get` returns it |
+| `ORDER_FULFILLED` | `order.fulfilled` | the `Order`, as `orders.get` returns it (with `creatorCode`: `{ code, creatorName }` or `null`) |
 | `ORDER_REFUNDED` | `order.refunded` | the `Order` |
 | `ORDER_CHARGEBACK` | `order.chargeback` | the `Order` |
 | `WALLET_CREDITED` | `wallet.credited` | `{ playerId, orderId, credits: [{ currency, paid, bonus }] }` |
@@ -264,7 +304,7 @@ An event of another type (GameCoin may add some) is returned as it is, with `dat
 ## Idempotency and retries
 
 Every call that changes something (`wallet.grant`, `wallet.spend`, `inventory.grant`, `inventory.consume`,
-`purchases.create`, `checkouts.create`) sends an `Idempotency-Key`. By default the SDK generates a UUID v4 **once per
+`purchases.create`, `checkouts.create`, `codes.redeem`) sends an `Idempotency-Key`. By default the SDK generates a UUID v4 **once per
 call** and reuses it for every retry of that call, so a retry can never apply a change twice.
 
 Pass your own key to make a retry of *your* code safe too, for instance the id of a quest completion. The result
@@ -340,6 +380,8 @@ try {
 | 404 | `NOT_FOUND` | Unknown player, currency, item, pack or order |
 | 409 | `INSUFFICIENT_FUNDS` | Wallet or item quantity too low (`details.required`, `details.available`) |
 | 409 | `LIMIT_REACHED` | `maxOwned`, `maxPerPlayer` or the balance ceiling exceeded |
+| 409 | `PACK_NOT_AVAILABLE` | The pack is outside its sale window (`details.startsAt`, `details.endsAt`) |
+| 409 | `PACK_SOLD_OUT` | No unit of the pack is left (`details.packSku`) |
 | 409 | `IDEMPOTENCY_CONFLICT` | Key reused with another request |
 | 409 | `CONFLICT` | Invalid state transition, e.g. refund of an unpaid order |
 | 429 | `RATE_LIMITED` | Too many requests (`retryAfter`) |

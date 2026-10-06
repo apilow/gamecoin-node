@@ -14,9 +14,9 @@ const manifest = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"
 };
 
 describe("package", () => {
-  it("VERSION is the version of package.json (0.2.0)", () => {
+  it("VERSION is the version of package.json (0.3.0)", () => {
     assert.equal(sdk.VERSION, manifest.version);
-    assert.equal(manifest.version, "0.2.0");
+    assert.equal(manifest.version, "0.3.0");
   });
 
   it("has no runtime dependency, Node 18+, and only typescript and @types/node for development", () => {
@@ -31,7 +31,7 @@ describe("package", () => {
 
   it("the client exposes the resources of the specification", () => {
     const gamecoin = new sdk.GameCoin(`gc_sk_test_${"x".repeat(30)}`);
-    for (const resource of ["catalog", "players", "wallet", "ledger", "inventory", "purchases", "checkouts", "orders"] as const) {
+    for (const resource of ["catalog", "players", "wallet", "ledger", "inventory", "purchases", "checkouts", "codes", "orders"] as const) {
       assert.equal(typeof gamecoin[resource], "object", resource);
     }
     const methods = {
@@ -42,6 +42,7 @@ describe("package", () => {
       inventory: ["list", "grant", "consume"],
       purchases: ["create"],
       checkouts: ["create"],
+      codes: ["redeem"],
       orders: ["get", "refund"],
     } as const;
     for (const [resource, names] of Object.entries(methods)) {

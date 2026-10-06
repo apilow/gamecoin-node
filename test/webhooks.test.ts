@@ -155,6 +155,35 @@ describe("webhooks.constructEvent: every event type", () => {
     }
   });
 
+  it("the order of an order.* event carries creatorCode: null, or the code with the creator's name", () => {
+    const without = through(fulfilled);
+    assert.ok(isKnownWebhookEvent(without));
+    if (isKnownWebhookEvent(without) && without.type === "order.fulfilled") assert.equal(without.data.creatorCode, null);
+    else assert.fail("expected an order event");
+
+    const creatorCode = { code: "ALICE10", creatorName: "Alice" };
+    for (const type of ["order.fulfilled", "order.refunded", "order.chargeback"] as const) {
+      const event = through({ ...fulfilled, type, data: { ...fulfilled.data, creatorCode: { ...creatorCode, rate: 10 } } });
+      assert.ok(isKnownWebhookEvent(event));
+      if (isKnownWebhookEvent(event) && (event.type === "order.fulfilled" || event.type === "order.refunded" || event.type === "order.chargeback")) {
+        assert.deepEqual(event.data.creatorCode, creatorCode);
+      } else {
+        assert.fail("expected an order event");
+      }
+    }
+  });
+
+  it("an older order event without the creatorCode field reads as null; a creatorCode of the wrong shape is an invalid_payload", () => {
+    const { creatorCode: _omitted, ...withoutField } = fulfilled.data;
+    void _omitted;
+    const old = through({ ...fulfilled, data: withoutField });
+    assert.ok(isKnownWebhookEvent(old));
+    if (isKnownWebhookEvent(old) && old.type === "order.fulfilled") assert.equal(old.data.creatorCode, null);
+    else assert.fail("expected an order event");
+    assert.equal(reasonOf(() => through({ ...fulfilled, data: { ...fulfilled.data, creatorCode: "ALICE10" } })), "invalid_payload");
+    assert.equal(reasonOf(() => through({ ...fulfilled, data: { ...fulfilled.data, creatorCode: { code: "A" } } })), "invalid_payload");
+  });
+
   it("wallet.credited carries who received what", () => {
     const event = through(credited);
     assert.ok(isKnownWebhookEvent(event) && event.type === "wallet.credited");

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { inspect } from "node:util";
 import { ErrorCode, GameCoin, GameCoinError, ext } from "../src/index.js";
-import { TEST_KEY, apiError, fakeFetch, harness } from "./helpers.js";
+import { TEST_KEY, apiError, emptyCatalogJson, fakeFetch, harness } from "./helpers.js";
 
 const P = ext("user-42");
 
@@ -37,6 +37,77 @@ describe("error mapping", () => {
     assert.deepEqual(error.details.fieldErrors, fieldErrors);
   });
 
+  it("a refused creator code is VALIDATION_FAILED with fieldErrors.creatorCode = CODE_INVALID, never retried", async () => {
+    const fieldErrors = { creatorCode: ["CODE_INVALID"] };
+    const { gamecoin, calls } = harness(apiError(400, "VALIDATION_FAILED", "Invalid request body", { fieldErrors }));
+    const error = await failure(gamecoin.checkouts.create(P, { packSku: "gems-500", creatorCode: "NOPE" }));
+    assert.equal(error.code, ErrorCode.VALIDATION_FAILED);
+    assert.equal(error.status, 400);
+    assert.deepEqual(error.details.fieldErrors, fieldErrors);
+    assert.equal(calls.length, 1);
+  });
+
+  it("a refused gift code is VALIDATION_FAILED with fieldErrors.code = CODE_INVALID, never retried", async () => {
+    const fieldErrors = { code: ["CODE_INVALID"] };
+    const { gamecoin, calls, waits } = harness(apiError(400, "VALIDATION_FAILED", "Invalid request body", { fieldErrors }));
+    const error = await failure(gamecoin.codes.redeem(P, "WRONG"));
+    assert.equal(error.code, ErrorCode.VALIDATION_FAILED);
+    assert.deepEqual(error.details.fieldErrors, fieldErrors);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(waits, []);
+  });
+
+  it("codes.redeem: PLAYER_BLOCKED, LIMIT_REACHED and CONFLICT come through, not retried", async () => {
+    for (const [status, code] of [
+      [403, ErrorCode.PLAYER_BLOCKED],
+      [409, ErrorCode.LIMIT_REACHED],
+      [409, ErrorCode.CONFLICT],
+    ] as const) {
+      const { gamecoin, calls } = harness(apiError(status, code, `message of ${code}`));
+      const error = await failure(gamecoin.codes.redeem(P, "GIFT"));
+      assert.deepEqual([error.status, error.code], [status, code]);
+      assert.equal(calls.length, 1);
+    }
+  });
+
+  it("codes.redeem: RATE_LIMITED is retried after Retry-After, and raised with retryAfter beyond the cap", async () => {
+    const limited = apiError(429, "RATE_LIMITED", "Too many requests", undefined, { "Retry-After": "3" });
+    const retried = harness([limited, { json: { grants: [], items: [], skipped: [] } }]);
+    assert.equal((await retried.gamecoin.codes.redeem(P, "GIFT")).replayed, false);
+    assert.deepEqual(retried.waits, [3000]);
+    const capped = harness(apiError(429, "RATE_LIMITED", "Too many requests", undefined, { "Retry-After": "900" }));
+    const error = await failure(capped.gamecoin.codes.redeem(P, "GIFT"));
+    assert.equal(error.code, ErrorCode.RATE_LIMITED);
+    assert.equal(error.retryAfter, 900);
+    assert.equal(capped.calls.length, 1);
+  });
+
+  it("PACK_NOT_AVAILABLE carries startsAt and endsAt in details (ISO text or null)", async () => {
+    const details = { startsAt: "2026-11-01T00:00:00.000Z", endsAt: null };
+    const { gamecoin, calls } = harness(apiError(409, "PACK_NOT_AVAILABLE", "This pack is not on sale", details));
+    const error = await failure(gamecoin.checkouts.create(P, { packSku: "founder" }));
+    assert.equal(error.code, ErrorCode.PACK_NOT_AVAILABLE);
+    assert.equal(error.status, 409);
+    assert.deepEqual(error.details, details);
+    assert.equal(error.details.startsAt, "2026-11-01T00:00:00.000Z");
+    assert.equal(error.details.endsAt, null);
+    assert.equal(calls.length, 1);
+  });
+
+  it("PACK_SOLD_OUT carries packSku in details, never retried", async () => {
+    const { gamecoin, calls } = harness(apiError(409, "PACK_SOLD_OUT", "This pack is sold out", { packSku: "founder" }));
+    const error = await failure(gamecoin.checkouts.create(P, { packSku: "founder" }));
+    assert.equal(error.code, ErrorCode.PACK_SOLD_OUT);
+    assert.equal(error.status, 409);
+    assert.deepEqual(error.details, { packSku: "founder" });
+    assert.equal(calls.length, 1);
+  });
+
+  it("the new constants are exported", () => {
+    assert.equal(ErrorCode.PACK_NOT_AVAILABLE, "PACK_NOT_AVAILABLE");
+    assert.equal(ErrorCode.PACK_SOLD_OUT, "PACK_SOLD_OUT");
+  });
+
   it("NOT_FOUND without details: details is an empty object", async () => {
     const { gamecoin } = harness(apiError(404, "NOT_FOUND", "Player not found"));
     const error = await failure(gamecoin.players.get(P));
@@ -69,6 +140,8 @@ describe("error mapping", () => {
       [404, "NOT_FOUND"],
       [409, "INSUFFICIENT_FUNDS"],
       [409, "LIMIT_REACHED"],
+      [409, "PACK_NOT_AVAILABLE"],
+      [409, "PACK_SOLD_OUT"],
       [409, "IDEMPOTENCY_CONFLICT"],
       [409, "CONFLICT"],
       [429, "RATE_LIMITED"],
@@ -162,7 +235,7 @@ describe("the secret key stays out of errors and string representations", () => 
   });
 
   it("the key is not on the object of the transport call beyond the Authorization header", async () => {
-    const { fetch, calls } = fakeFetch({ json: { currencies: [], items: [], packs: [] } });
+    const { fetch, calls } = fakeFetch({ json: emptyCatalogJson });
     await new GameCoin(TEST_KEY, { fetch }).catalog.get();
     const [call] = calls;
     assert.ok(call);

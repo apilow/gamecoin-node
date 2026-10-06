@@ -1,6 +1,7 @@
 import { HttpClient, defaultSleep } from "./http.js";
 import { CatalogResource } from "./resources/catalog.js";
 import { CheckoutsResource } from "./resources/checkouts.js";
+import { CodesResource } from "./resources/codes.js";
 import { InventoryResource } from "./resources/inventory.js";
 import { LedgerResource } from "./resources/ledger.js";
 import { OrdersResource } from "./resources/orders.js";
@@ -43,6 +44,7 @@ export class GameCoin {
   readonly inventory: InventoryResource;
   readonly purchases: PurchasesResource;
   readonly checkouts: CheckoutsResource;
+  readonly codes: CodesResource;
   readonly orders: OrdersResource;
 
   readonly #maskedKey: string;
@@ -88,6 +90,7 @@ export class GameCoin {
     this.inventory = new InventoryResource(http);
     this.purchases = new PurchasesResource(http);
     this.checkouts = new CheckoutsResource(http);
+    this.codes = new CodesResource(http);
     this.orders = new OrdersResource(http);
   }
 

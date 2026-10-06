@@ -15,14 +15,16 @@ export class CheckoutsResource {
   /**
    * Orders a pack for a player and returns the order (`pending`) with the URL of the hosted payment page. A replay
    * with the same idempotency key returns the order in its *current* state, with `replayed: true`. Creates the `ext:`
-   * player when missing. `POST /players/{player}/checkouts`
+   * player when missing. `PACK_NOT_AVAILABLE` (`details.startsAt`, `details.endsAt`) and `PACK_SOLD_OUT` (`details.packSku`)
+   * are possible, and a refused `creatorCode` is `VALIDATION_FAILED` with `details.fieldErrors.creatorCode`.
+   * `POST /players/{player}/checkouts`
    */
   async create(player: PlayerRef, params: CheckoutParams, options?: MutationOptions): Promise<Checkout> {
     const path = playerPath(player, "/checkouts");
     const fields = requireObject(params, "params");
-    assertKnownKeys(fields, ["packSku", "successUrl", "cancelUrl", "country", "locale"], "params");
+    assertKnownKeys(fields, ["packSku", "successUrl", "cancelUrl", "country", "locale", "creatorCode"], "params");
     const body: Record<string, string> = { packSku: requireString(fields.packSku, "params.packSku") };
-    for (const key of ["successUrl", "cancelUrl", "country", "locale"] as const) {
+    for (const key of ["successUrl", "cancelUrl", "country", "locale", "creatorCode"] as const) {
       const value = optionalString(fields[key], `params.${key}`);
       if (value !== undefined) body[key] = value;
     }

@@ -147,6 +147,8 @@ describe("no retry on 4xx", () => {
     [404, "NOT_FOUND"],
     [409, "INSUFFICIENT_FUNDS"],
     [409, "LIMIT_REACHED"],
+    [409, "PACK_NOT_AVAILABLE"],
+    [409, "PACK_SOLD_OUT"],
     [409, "IDEMPOTENCY_CONFLICT"],
     [409, "CONFLICT"],
   ];
@@ -295,6 +297,8 @@ describe("unusable responses", () => {
       "LIMIT_REACHED",
       "NETWORK_ERROR",
       "NOT_FOUND",
+      "PACK_NOT_AVAILABLE",
+      "PACK_SOLD_OUT",
       "PAYMENT_FAILED",
       "PLAYER_BLOCKED",
       "RATE_LIMITED",

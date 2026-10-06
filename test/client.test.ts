@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { inspect } from "node:util";
 import { DEFAULT_BASE_URL, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, GameCoin, GameCoinError, VERSION } from "../src/index.js";
-import { LIVE_KEY, TEST_KEY, fakeFetch, harness, movementJson } from "./helpers.js";
+import { LIVE_KEY, TEST_KEY, fakeFetch, emptyCatalogJson, harness, movementJson } from "./helpers.js";
 
 describe("client: authentication, headers, configuration", () => {
   it("sends the secret key as a Bearer token, Accept, and the user agent gamecoin-node/<version> (node/<version>)", async () => {
-    const { gamecoin, calls } = harness({ json: { currencies: [], items: [], packs: [] } });
+    const { gamecoin, calls } = harness({ json: emptyCatalogJson });
     await gamecoin.catalog.get();
     const [call] = calls;
     assert.ok(call);
@@ -67,7 +67,7 @@ describe("client: authentication, headers, configuration", () => {
   });
 
   it("trims whitespace around the key (a value read from a file often ends with a newline)", async () => {
-    const { fetch, calls } = fakeFetch({ json: { currencies: [], items: [], packs: [] } });
+    const { fetch, calls } = fakeFetch({ json: emptyCatalogJson });
     await new GameCoin(`  ${TEST_KEY}\r\n`, { fetch }).catalog.get();
     assert.equal(calls[0]?.headers.authorization, `Bearer ${TEST_KEY}`);
   });
@@ -86,7 +86,7 @@ describe("client: authentication, headers, configuration", () => {
       ["http://localhost:3400/", "http://localhost:3400/api/v1/catalog"],
       ["https://example.com/gamecoin//", "https://example.com/gamecoin/api/v1/catalog"],
     ] as const) {
-      const { fetch, calls } = fakeFetch({ json: { currencies: [], items: [], packs: [] } });
+      const { fetch, calls } = fakeFetch({ json: emptyCatalogJson });
       await new GameCoin(TEST_KEY, { baseUrl: given, fetch }).catalog.get();
       assert.equal(calls[0]?.url, expected, given);
     }

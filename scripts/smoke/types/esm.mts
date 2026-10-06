@@ -61,3 +61,22 @@ function handle(rawBody: Buffer, signature: string | undefined): string {
 }
 
 void handle;
+
+// v0.3: gift codes, creator code on checkouts, pack availability.
+import { type PackAvailability, type Redemption } from "@apilow/gamecoin";
+
+const redemption: Redemption = await gamecoin.codes.redeem(player, "GIFT-2026", { idempotencyKey: "gift-1" });
+const gifted: number | undefined = redemption.grants[0]?.balance.total;
+const skippedSku: string | undefined = redemption.skipped[0]?.sku;
+await gamecoin.checkouts.create(player, { packSku: "founder", creatorCode: "ALICE10" });
+const catalog = await gamecoin.catalog.get();
+const availability: PackAvailability | null | undefined = catalog.packs[0]?.availability;
+const startsAt: Date | null | undefined = availability?.startsAt;
+const launchAt: Date | null = catalog.launchAt;
+const prelaunch: boolean = catalog.prelaunch;
+const creatorName: string | undefined = order.creatorCode?.creatorName;
+const soldOut: string = ErrorCode.PACK_SOLD_OUT;
+// @ts-expect-error the gift code is a string, not an object
+await gamecoin.codes.redeem(player, { code: "GIFT" });
+
+void [gifted, skippedSku, startsAt, launchAt, prelaunch, creatorName, soldOut, ErrorCode.PACK_NOT_AVAILABLE];

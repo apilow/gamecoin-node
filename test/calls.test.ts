@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ext } from "../src/index.js";
+import { GameCoinError, ext } from "../src/index.js";
 import type { GameCoin } from "../src/index.js";
 import {
   AT,
@@ -9,6 +9,7 @@ import {
   LATER,
   balanceJson,
   checkoutJson,
+  emptyCatalogJson,
   entryJson,
   harness,
   movementJson,
@@ -32,7 +33,12 @@ interface Case {
   idempotent?: boolean;
 }
 
-const catalogJson = { currencies: [{ code: "gems", name: "Gems", purchasable: true }], items: [], packs: [] };
+const catalogJson = { ...emptyCatalogJson, currencies: [{ code: "gems", name: "Gems", purchasable: true }] };
+const redemptionJson = {
+  grants: [{ currency: "gems", amount: 50, balance: balanceJson }],
+  items: [{ sku: "potion", quantity: 2 }],
+  skipped: [{ sku: "fire-sword", quantity: 1 }],
+};
 
 /** Every method of SPEC § 3: the HTTP verb, the URL, the body and the idempotency header it produces. */
 const cases: Case[] = [
@@ -149,6 +155,33 @@ const cases: Case[] = [
     body: { packSku: "gems-500" },
     idempotent: true,
   },
+  {
+    name: "checkouts.create(player, params with creatorCode)",
+    reply: checkoutJson,
+    run: (g) => g.checkouts.create(P, { packSku: "gems-500", creatorCode: "ALICE10" }),
+    method: "POST",
+    url: `${PATH}/checkouts`,
+    body: { packSku: "gems-500", creatorCode: "ALICE10" },
+    idempotent: true,
+  },
+  {
+    name: "checkouts.create(player, only a pack): creatorCode is not sent when absent",
+    reply: checkoutJson,
+    run: (g) => g.checkouts.create(P, { packSku: "gems-500", creatorCode: undefined }),
+    method: "POST",
+    url: `${PATH}/checkouts`,
+    body: { packSku: "gems-500" },
+    idempotent: true,
+  },
+  {
+    name: "codes.redeem(player, code): the code is sent as typed",
+    reply: redemptionJson,
+    run: (g) => g.codes.redeem(P, " gift-2026 ab "),
+    method: "POST",
+    url: `${PATH}/codes/redeem`,
+    body: { code: " gift-2026 ab " },
+    idempotent: true,
+  },
   { name: "orders.get(orderId)", reply: orderJson, run: (g) => g.orders.get(ID_ORDER), method: "GET", url: `https://gamecoin.test/api/v1/orders/${ID_ORDER}` },
   {
     name: "orders.refund(orderId, params): no idempotency key",
@@ -183,13 +216,14 @@ describe("every method: verb, URL, query, body, idempotency header", () => {
     });
   }
 
-  it("covers the 15 methods of the specification", () => {
+  it("covers the 17 methods of the specification", () => {
     const names = new Set(cases.map((c) => c.name.split("(")[0]));
     assert.deepEqual(
       [...names].sort(),
       [
         "catalog.get",
         "checkouts.create",
+        "codes.redeem",
         "inventory.consume",
         "inventory.grant",
         "inventory.list",
@@ -287,6 +321,14 @@ describe("arguments are checked before any request", () => {
     { name: "empty packSku", error: RangeError, run: (g) => g.checkouts.create(P1, { packSku: "" }) },
     { name: "empty locale", error: RangeError, run: (g) => g.checkouts.create(P1, { packSku: "x", locale: "" }) },
     { name: "locale of the wrong type", error: TypeError, run: (g) => g.checkouts.create(P1, { packSku: "x", locale: 3 as never }) },
+    { name: "empty creatorCode", error: RangeError, run: (g) => g.checkouts.create(P1, { packSku: "x", creatorCode: "" }) },
+    { name: "creatorCode of the wrong type", error: TypeError, run: (g) => g.checkouts.create(P1, { packSku: "x", creatorCode: 3 as never }) },
+    { name: "empty gift code", error: RangeError, run: (g) => g.codes.redeem(P1, "") },
+    { name: "gift code of the wrong type", error: TypeError, run: (g) => g.codes.redeem(P1, 42 as never) },
+    { name: "missing gift code", error: TypeError, run: (g) => g.codes.redeem(P1, undefined as never) },
+    { name: "gift code given as an object", error: TypeError, run: (g) => g.codes.redeem(P1, { code: "X" } as never) },
+    { name: "redeem for an empty player", error: RangeError, run: (g) => g.codes.redeem("", "X") },
+    { name: "redeem with an unknown option", error: RangeError, run: (g) => g.codes.redeem(P1, "X", { foo: 1 } as never) },
     { name: "unknown checkout field", error: RangeError, run: (g) => g.checkouts.create(P1, { packSku: "x", currency: "EUR" } as never) },
     { name: "ledger limit 0", error: RangeError, run: (g) => g.ledger.list(P1, { limit: 0 }) },
     { name: "ledger limit 101", error: RangeError, run: (g) => g.ledger.list(P1, { limit: 101 }) },
@@ -399,8 +441,34 @@ describe("responses become typed objects", () => {
           { sku: "badge", name: "Badge", description: "Shiny", type: "durable", price: null, maxOwned: 1, clientPurchasable: false, metadata: { rarity: "epic" } },
         ],
         packs: [
-          { sku: "gems-500", name: "500 gems", description: null, priceCents: 499, currency: "EUR", grants: [{ currency: "gems", amount: 500, bonus: 50 }], items: [{ sku: "potion", quantity: 2 }], badge: "best", maxPerPlayer: null },
+          { sku: "gems-500", name: "500 gems", description: null, priceCents: 499, currency: "EUR", grants: [{ currency: "gems", amount: 500, bonus: 50 }], items: [{ sku: "potion", quantity: 2 }], badge: "best", maxPerPlayer: null, availability: null },
+          {
+            sku: "founder",
+            name: "Founder pack",
+            description: null,
+            priceCents: 2999,
+            currency: "EUR",
+            grants: [],
+            items: [],
+            badge: null,
+            maxPerPlayer: 1,
+            availability: { startsAt: AT, endsAt: null, remaining: 12, founder: true, ignored: 1 },
+          },
+          {
+            sku: "weekend",
+            name: "Weekend pack",
+            description: null,
+            priceCents: 999,
+            currency: "EUR",
+            grants: [],
+            items: [],
+            badge: null,
+            maxPerPlayer: null,
+            availability: { startsAt: null, endsAt: LATER, remaining: null, founder: false },
+          },
         ],
+        prelaunch: true,
+        launchAt: LATER,
       },
     }).gamecoin.catalog.get();
     assert.deepEqual(catalog.currencies, [{ code: "gems", name: "Gems", purchasable: true }]);
@@ -412,6 +480,80 @@ describe("responses become typed objects", () => {
     assert.deepEqual(catalog.packs[0]?.items, [{ sku: "potion", quantity: 2 }]);
     assert.equal(catalog.packs[0]?.badge, "best");
     assert.equal(catalog.packs[0]?.maxPerPlayer, null);
+  });
+
+  it("parses pack availability (null, bounded, open-ended), prelaunch and launchAt", async () => {
+    const catalog = await harness({
+      json: {
+        ...emptyCatalogJson,
+        prelaunch: true,
+        launchAt: LATER,
+        packs: [
+          { sku: "a", name: "A", description: null, priceCents: 1, currency: "EUR", grants: [], items: [], badge: null, maxPerPlayer: null, availability: null },
+          { sku: "b", name: "B", description: null, priceCents: 1, currency: "EUR", grants: [], items: [], badge: null, maxPerPlayer: null, availability: { startsAt: AT, endsAt: LATER, remaining: 0, founder: true, extra: 1 } },
+          { sku: "c", name: "C", description: null, priceCents: 1, currency: "EUR", grants: [], items: [], badge: null, maxPerPlayer: null, availability: { startsAt: null, endsAt: null, remaining: null, founder: false } },
+        ],
+      },
+    }).gamecoin.catalog.get();
+    assert.equal(catalog.prelaunch, true);
+    assert.ok(catalog.launchAt instanceof Date);
+    assert.equal(catalog.launchAt.toISOString(), LATER);
+    assert.equal(catalog.packs[0]?.availability, null);
+    const bounded = catalog.packs[1]?.availability;
+    assert.ok(bounded);
+    assert.deepEqual(bounded, { startsAt: new Date(AT), endsAt: new Date(LATER), remaining: 0, founder: true });
+    assert.ok(bounded.startsAt instanceof Date && bounded.endsAt instanceof Date);
+    assert.deepEqual(catalog.packs[2]?.availability, { startsAt: null, endsAt: null, remaining: null, founder: false });
+    const plain = await harness({ json: emptyCatalogJson }).gamecoin.catalog.get();
+    assert.equal(plain.prelaunch, false);
+    assert.equal(plain.launchAt, null);
+  });
+
+  it("rejects a catalog or an availability of the wrong shape as INVALID_RESPONSE", async () => {
+    const pack = { sku: "a", name: "A", description: null, priceCents: 1, currency: "EUR", grants: [], items: [], badge: null, maxPerPlayer: null };
+    const bad: unknown[] = [
+      { ...emptyCatalogJson, prelaunch: "yes" },
+      { ...emptyCatalogJson, launchAt: "tomorrow" },
+      { ...emptyCatalogJson, packs: [{ ...pack, availability: { startsAt: null, endsAt: null, remaining: 1.5, founder: false } }] },
+      { ...emptyCatalogJson, packs: [{ ...pack, availability: { startsAt: null, endsAt: null, remaining: null } }] },
+      { ...emptyCatalogJson, packs: [{ ...pack, availability: { startsAt: "nope", endsAt: null, remaining: null, founder: false } }] },
+    ];
+    for (const json of bad) {
+      await assert.rejects(
+        () => harness({ json }).gamecoin.catalog.get(),
+        (error: unknown) => error instanceof GameCoinError && error.code === "INVALID_RESPONSE",
+      );
+    }
+  });
+
+  it("parses Order.creatorCode: an object with the creator's name, or null", async () => {
+    const withCode = { ...orderJson, creatorCode: { code: "ALICE10", creatorName: "Alice", rate: 10 } };
+    const { gamecoin } = harness([{ json: withCode }, { json: orderJson }, { json: { ...orderJson, creatorCode: { code: "X" } } }]);
+    const order = await gamecoin.orders.get(ID_ORDER);
+    assert.deepEqual(order.creatorCode, { code: "ALICE10", creatorName: "Alice" });
+    assert.equal((await gamecoin.orders.get(ID_ORDER)).creatorCode, null);
+    await assert.rejects(
+      () => gamecoin.orders.get(ID_ORDER),
+      (error: unknown) => error instanceof GameCoinError && error.code === "INVALID_RESPONSE",
+    );
+  });
+
+  it("parses a redemption: grants with their balance, items, skipped items, and replayed", async () => {
+    const { gamecoin } = harness([{ json: redemptionJson }, { json: { grants: [], items: [], skipped: [] }, headers: { "Idempotent-Replayed": "true" } }]);
+    const redemption = await gamecoin.codes.redeem(P, "GIFT");
+    assert.deepEqual(redemption, { ...redemptionJson, replayed: false });
+    assert.deepEqual(redemption.grants[0]?.balance, balanceJson);
+    const replay = await gamecoin.codes.redeem(P, "GIFT", { idempotencyKey: "k-1" });
+    assert.deepEqual(replay, { grants: [], items: [], skipped: [], replayed: true });
+  });
+
+  it("rejects a redemption of the wrong shape as INVALID_RESPONSE", async () => {
+    for (const json of [{ ...redemptionJson, skipped: undefined }, { ...redemptionJson, grants: [{ currency: "gems", amount: 5 }] }, { ...redemptionJson, items: [{ sku: "p", quantity: "2" }] }]) {
+      await assert.rejects(
+        () => harness({ json }).gamecoin.codes.redeem(P, "GIFT"),
+        (error: unknown) => error instanceof GameCoinError && error.code === "INVALID_RESPONSE",
+      );
+    }
   });
 
   it("parses orders: money as integers, dates as Date or null, unknown fields ignored", async () => {

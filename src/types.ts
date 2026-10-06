@@ -94,6 +94,24 @@ export interface Pack {
   badge: string | null;
   /** Most orders per player; `null` for no limit. */
   maxPerPlayer: number | null;
+  /** Sale window and stock; `null` for an ordinary pack (always on sale, no limit). */
+  availability: PackAvailability | null;
+}
+
+/**
+ * When and how many of a pack can be bought. The catalog lists every active pack, scheduled, ended or sold out ones
+ * included: your shop decides what to show. `checkouts.create` refuses a pack outside its window (`PACK_NOT_AVAILABLE`)
+ * or without a unit left (`PACK_SOLD_OUT`).
+ */
+export interface PackAvailability {
+  /** First instant of sale (included); `null` for no start. */
+  startsAt: Date | null;
+  /** First instant when the pack is no longer on sale (excluded); `null` for no end. */
+  endsAt: Date | null;
+  /** Units left in this environment (test and live have separate stocks); `null` for an unlimited stock. */
+  remaining: number | null;
+  /** True for a founder pack. */
+  founder: boolean;
 }
 
 /** Active entries only. */
@@ -101,6 +119,10 @@ export interface Catalog {
   currencies: Currency[];
   items: Item[];
   packs: Pack[];
+  /** True while the game is in pre-launch: a shop shows pre-orders with `launchAt`. */
+  prelaunch: boolean;
+  /** The launch date set in the game settings; `null` when none. */
+  launchAt: Date | null;
 }
 
 export type OrderStatus = "pending" | "paid" | "fulfilled" | "refunded" | "chargeback" | "failed" | "canceled" | "expired";
@@ -121,6 +143,8 @@ export interface Order {
   paidAt: Date | null;
   fulfilledAt: Date | null;
   refundedAt: Date | null;
+  /** The creator code used at checkout, with the creator's name (never the rates); `null` when none. */
+  creatorCode: { code: string; creatorName: string } | null;
 }
 
 // --- Results -----------------------------------------------------------------------------------------------
@@ -165,6 +189,18 @@ export interface Checkout {
   /** Hosted payment page: send the player there. */
   checkoutUrl: string;
   /** True when the order is the replay of an earlier request; it is then in its current state. */
+  replayed: boolean;
+}
+
+/**
+ * Result of `codes.redeem`: what the gift code gave. Coins are always free (`bonus` bucket). `skipped` lists the items
+ * the player could not receive (`maxOwned` reached).
+ */
+export interface Redemption {
+  grants: { currency: string; amount: number; balance: Balance }[];
+  items: { sku: string; quantity: number }[];
+  skipped: { sku: string; quantity: number }[];
+  /** True when the API answered from an earlier request with the same idempotency key (no second credit). */
   replayed: boolean;
 }
 
@@ -222,6 +258,12 @@ export interface CheckoutParams {
    * ignores any other value. A pending order that the API reuses takes the language of the latest request.
    */
   locale?: "fr" | "en" | "nl" | (string & {});
+  /**
+   * A creator code typed by the buyer. The buyer then gets a bonus of free coins on delivery, and the creator a
+   * commission. A refused code (unknown, disabled, not valid for the pack, or the creator's own player) is a
+   * `VALIDATION_FAILED` error with `details.fieldErrors.creatorCode = ["CODE_INVALID"]`. Not sent when absent.
+   */
+  creatorCode?: string;
 }
 
 export interface RefundParams {

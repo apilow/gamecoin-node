@@ -23,6 +23,10 @@ export const ErrorCode = Object.freeze({
   INSUFFICIENT_FUNDS: "INSUFFICIENT_FUNDS",
   /** 409: `maxOwned`, `maxPerPlayer` or the balance ceiling exceeded. */
   LIMIT_REACHED: "LIMIT_REACHED",
+  /** 409: the pack is outside its sale window (`details.startsAt`, `details.endsAt`: ISO 8601 text or `null`). */
+  PACK_NOT_AVAILABLE: "PACK_NOT_AVAILABLE",
+  /** 409: no unit of the pack is left (`details.packSku`). */
+  PACK_SOLD_OUT: "PACK_SOLD_OUT",
   /** 409: an `Idempotency-Key` was reused with another request. */
   IDEMPOTENCY_CONFLICT: "IDEMPOTENCY_CONFLICT",
   /** 409: invalid state transition (e.g. refund of an unpaid order). */

@@ -9,8 +9,10 @@ import type {
   LedgerPage,
   Order,
   Pack,
+  PackAvailability,
   Player,
   PlayerToken,
+  Redemption,
   Wallet,
   WalletCreditedData,
 } from "./types.js";
@@ -191,6 +193,17 @@ function parsePack(value: unknown, path: string): Pack {
     }),
     badge: strOrNull(o, "badge", path),
     maxPerPlayer: intOrNull(o, "maxPerPlayer", path),
+    availability: o.availability === null ? null : parseAvailability(o.availability, `${path}.availability`),
+  };
+}
+
+function parseAvailability(value: unknown, path: string): PackAvailability {
+  const o = obj(value, path);
+  return {
+    startsAt: dateOrNull(o, "startsAt", path),
+    endsAt: dateOrNull(o, "endsAt", path),
+    remaining: intOrNull(o, "remaining", path),
+    founder: bool(o, "founder", path),
   };
 }
 
@@ -200,6 +213,8 @@ export function parseCatalog(value: unknown, path = "catalog"): Catalog {
     currencies: list(o, "currencies", path, parseCurrency),
     items: list(o, "items", path, parseItem),
     packs: list(o, "packs", path, parsePack),
+    prelaunch: bool(o, "prelaunch", path),
+    launchAt: dateOrNull(o, "launchAt", path),
   };
 }
 
@@ -221,7 +236,14 @@ export function parseOrder(value: unknown, path = "order"): Order {
     paidAt: dateOrNull(o, "paidAt", path),
     fulfilledAt: dateOrNull(o, "fulfilledAt", path),
     refundedAt: dateOrNull(o, "refundedAt", path),
+    // Absent reads as null: a webhook event stored before creator codes existed is sent again as it was.
+    creatorCode: o.creatorCode === null || o.creatorCode === undefined ? null : parseCreatorCode(o.creatorCode, `${path}.creatorCode`),
   };
+}
+
+function parseCreatorCode(value: unknown, path: string): { code: string; creatorName: string } {
+  const o = obj(value, path);
+  return { code: str(o, "code", path), creatorName: str(o, "creatorName", path) };
 }
 
 // --- Composed responses ------------------------------------------------------------------------------------
@@ -261,6 +283,22 @@ export function parsePurchase(value: unknown): { entry: LedgerEntry; balance: Ba
 export function parseCheckout(value: unknown): { order: Order; checkoutUrl: string } {
   const o = obj(value, "response");
   return { order: parseOrder(o.order, "response.order"), checkoutUrl: str(o, "checkoutUrl", "response") };
+}
+
+export function parseRedemption(value: unknown): Omit<Redemption, "replayed"> {
+  const o = obj(value, "response");
+  const line = (entry: unknown, entryPath: string): { sku: string; quantity: number } => {
+    const l = obj(entry, entryPath);
+    return { sku: str(l, "sku", entryPath), quantity: int(l, "quantity", entryPath) };
+  };
+  return {
+    grants: list(o, "grants", "response", (grant, grantPath) => {
+      const g = obj(grant, grantPath);
+      return { currency: str(g, "currency", grantPath), amount: int(g, "amount", grantPath), balance: parseBalance(g.balance, `${grantPath}.balance`) };
+    }),
+    items: list(o, "items", "response", line),
+    skipped: list(o, "skipped", "response", line),
+  };
 }
 
 // --- Webhook events ----------------------------------------------------------------------------------------

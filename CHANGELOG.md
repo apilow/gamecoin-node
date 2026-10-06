@@ -4,6 +4,30 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/) (while the version is 0.x, a minor release may change the API).
 
+## [0.3.0] - Unreleased
+
+Gift codes; creator code on checkouts; pack availability.
+
+### Added
+
+- `codes.redeem(player, code, options?)`: redeems a gift code (free coins in the `bonus` bucket, and items). The code is sent as
+  typed. Returns a `Redemption` `{ grants, items, skipped, replayed }`; it sends an idempotency key like the other
+  state-changing calls. A refused code is `VALIDATION_FAILED` with `details.fieldErrors.code = ["CODE_INVALID"]`, never retried.
+  New `codes` resource: nine resources and seventeen calls.
+- `checkouts.create` accepts `creatorCode`; it is not sent when absent. A refused code is `VALIDATION_FAILED` with
+  `details.fieldErrors.creatorCode = ["CODE_INVALID"]`.
+- `Order.creatorCode` (`{ code, creatorName }` or `null`), also on the orders of the `order.*` webhook events (an event that
+  has no such field reads as `null`).
+- `Pack.availability` (`null` or `{ startsAt, endsAt, remaining, founder }`, dates as `Date` or `null`), `Catalog.prelaunch`
+  and `Catalog.launchAt`; the `PackAvailability` and `Redemption` types.
+- Error codes `ErrorCode.PACK_NOT_AVAILABLE` (`details.startsAt`, `details.endsAt`: ISO 8601 text or `null`) and
+  `ErrorCode.PACK_SOLD_OUT` (`details.packSku`), both HTTP 409.
+
+### Changed
+
+- The response parsers are strict on the new fields: a catalog without `prelaunch` / `launchAt` or a pack without
+  `availability` is an `INVALID_RESPONSE`. This version needs the GameCoin API of sprint 3 or later.
+
 ## [0.2.0] - Unreleased
 
 `locale` on checkouts; webhook signature verification.

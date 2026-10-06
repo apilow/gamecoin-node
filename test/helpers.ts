@@ -114,6 +114,8 @@ export const orderJson = {
   paidAt: null,
   fulfilledAt: null,
   refundedAt: null,
+  creatorCode: null,
 };
+export const emptyCatalogJson = { currencies: [], items: [], packs: [], prelaunch: false, launchAt: null };
 export const movementJson = { entry: entryJson, balance: balanceJson };
 export const checkoutJson = { order: orderJson, checkoutUrl: `https://gamecoin.test/pay/${ID_ORDER}?t=signed` };

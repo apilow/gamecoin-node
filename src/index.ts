@@ -8,6 +8,7 @@ export type { WebhookSignatureReason } from "./webhooks.js";
 
 export type { CatalogResource } from "./resources/catalog.js";
 export type { CheckoutsResource } from "./resources/checkouts.js";
+export type { CodesResource } from "./resources/codes.js";
 export type { InventoryResource } from "./resources/inventory.js";
 export type { LedgerResource } from "./resources/ledger.js";
 export type { OrdersResource } from "./resources/orders.js";
@@ -45,12 +46,14 @@ export type {
   OrderStatus,
   OrderWebhookEvent,
   Pack,
+  PackAvailability,
   Player,
   PlayerKind,
   PlayerProfile,
   PlayerRef,
   PlayerToken,
   Purchase,
+  Redemption,
   RefundParams,
   RequestOptions,
   SleepFunction,

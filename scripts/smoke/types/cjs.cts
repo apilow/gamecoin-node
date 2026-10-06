@@ -36,3 +36,14 @@ function handleWebhook(rawBody: string, signature: string): string {
 }
 
 void handleWebhook;
+
+// v0.3: gift codes and the new error codes through `require`.
+async function redeem(): Promise<number> {
+  const gamecoin = new GameCoin("gc_sk_test_x");
+  const redemption: gamecoinSdk.Redemption = await gamecoin.codes.redeem(ext("user-42"), "GIFT-2026");
+  const unavailable: string = ErrorCode.PACK_NOT_AVAILABLE;
+  void unavailable;
+  return redemption.grants.length;
+}
+
+void redeem;

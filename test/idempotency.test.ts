@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ErrorCode, ext, type GameCoin } from "../src/index.js";
-import { apiError, balanceJson, checkoutJson, entryJson, harness, movementJson, orderJson, playerJson, potionJson } from "./helpers.js";
+import { apiError, balanceJson, checkoutJson, emptyCatalogJson, entryJson, harness, movementJson, orderJson, playerJson, potionJson } from "./helpers.js";
 
 const P = ext("user-42");
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-/** The six ⟳ calls of the server API, each with the reply that makes it succeed. */
+/** The seven ⟳ calls of the server API, each with the reply that makes it succeed. */
 const mutations: { name: string; reply: unknown; run: (g: GameCoin, key?: string) => Promise<{ replayed: boolean }> }[] = [
   { name: "wallet.grant", reply: movementJson, run: (g, k) => g.wallet.grant(P, { currency: "gems", amount: 1 }, k ? { idempotencyKey: k } : undefined) },
   { name: "wallet.spend", reply: movementJson, run: (g, k) => g.wallet.spend(P, { currency: "gems", amount: 1 }, k ? { idempotencyKey: k } : undefined) },
@@ -18,6 +18,11 @@ const mutations: { name: string; reply: unknown; run: (g: GameCoin, key?: string
     run: (g, k) => g.purchases.create(P, { sku: "potion" }, k ? { idempotencyKey: k } : undefined),
   },
   { name: "checkouts.create", reply: checkoutJson, run: (g, k) => g.checkouts.create(P, { packSku: "gems-500" }, k ? { idempotencyKey: k } : undefined) },
+  {
+    name: "codes.redeem",
+    reply: { grants: [{ currency: "gems", amount: 50, balance: balanceJson }], items: [], skipped: [] },
+    run: (g, k) => g.codes.redeem(P, "GIFT-2026", k ? { idempotencyKey: k } : undefined),
+  },
 ];
 
 describe("idempotency", () => {
@@ -91,7 +96,7 @@ describe("idempotency", () => {
       { json: orderJson },
       { json: orderJson },
       { json: { token: "gc_pt_x.y", expiresAt: "2026-10-05T13:00:00.000Z" } },
-      { json: { currencies: [], items: [], packs: [] } },
+      { json: emptyCatalogJson },
       { json: playerJson },
     ]);
     await gamecoin.orders.get("o1");
