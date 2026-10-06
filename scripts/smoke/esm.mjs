@@ -1,9 +1,10 @@
 // Run by scripts/check-package.mjs: the built package, loaded with `import` the way a user's ES module does it.
 import assert from "node:assert/strict";
-import { ErrorCode, GameCoin, GameCoinError, VERSION, ext } from "@apilow/gamecoin";
+import { createHmac } from "node:crypto";
+import { ErrorCode, GameCoin, GameCoinError, VERSION, WebhookSignatureError, ext, webhooks } from "@apilow/gamecoin";
 import * as namespace from "@apilow/gamecoin";
 
-assert.deepEqual(Object.keys(namespace).sort(), ["DEFAULT_BASE_URL", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_MS", "ErrorCode", "GameCoin", "GameCoinError", "VERSION", "ext"]);
+assert.deepEqual(Object.keys(namespace).sort(), ["DEFAULT_BASE_URL", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_MS", "DEFAULT_WEBHOOK_TOLERANCE_SECONDS", "ErrorCode", "GameCoin", "GameCoinError", "VERSION", "WebhookEventType", "WebhookSignatureError", "ext", "isKnownWebhookEvent", "webhooks"]);
 assert.equal(typeof GameCoin, "function");
 assert.equal(ext("user-42"), "ext:user-42");
 assert.equal(ErrorCode.INSUFFICIENT_FUNDS, "INSUFFICIENT_FUNDS");
@@ -35,5 +36,12 @@ await assert.rejects(
   (error) => error instanceof GameCoinError && error.code === ErrorCode.NOT_FOUND && error.status === 404,
 );
 assert.ok(!String(gamecoin).includes(key));
+
+// Webhook verification through the built code.
+const hookBody = JSON.stringify({ id: "evt_1", type: "webhook.test", createdAt: "2026-10-06T10:00:00.000Z", env: "test", data: { message: "hi" } });
+const stamp = Math.floor(Date.now() / 1000);
+const hookHeader = `t=${stamp},v1=${createHmac("sha256", "whsec_gc_smoke").update(`${stamp}.${hookBody}`).digest("hex")}`;
+assert.equal(webhooks.constructEvent(hookBody, hookHeader, "whsec_gc_smoke").data.message, "hi");
+assert.throws(() => webhooks.constructEvent(hookBody, hookHeader, "whsec_gc_other"), (error) => error instanceof WebhookSignatureError && error.reason === "no_matching_signature");
 
 console.log(`ESM ok: import { GameCoin, ext, GameCoinError } from "@apilow/gamecoin" (version ${VERSION})`);

@@ -14,9 +14,9 @@ const manifest = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"
 };
 
 describe("package", () => {
-  it("VERSION is the version of package.json (0.1.0)", () => {
+  it("VERSION is the version of package.json (0.2.0)", () => {
     assert.equal(sdk.VERSION, manifest.version);
-    assert.equal(manifest.version, "0.1.0");
+    assert.equal(manifest.version, "0.2.0");
   });
 
   it("has no runtime dependency, Node 18+, and only typescript and @types/node for development", () => {
@@ -25,8 +25,8 @@ describe("package", () => {
     assert.deepEqual(Object.keys(manifest.devDependencies).sort(), ["@types/node", "typescript"]);
   });
 
-  it("exports GameCoin, ext, GameCoinError, ErrorCode and VERSION", () => {
-    assert.deepEqual(Object.keys(sdk).sort(), ["DEFAULT_BASE_URL", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_MS", "ErrorCode", "GameCoin", "GameCoinError", "VERSION", "ext"]);
+  it("exports GameCoin, ext, GameCoinError, ErrorCode, VERSION and the webhook helpers", () => {
+    assert.deepEqual(Object.keys(sdk).sort(), ["DEFAULT_BASE_URL", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_MS", "DEFAULT_WEBHOOK_TOLERANCE_SECONDS", "ErrorCode", "GameCoin", "GameCoinError", "VERSION", "WebhookEventType", "WebhookSignatureError", "ext", "isKnownWebhookEvent", "webhooks"]);
   });
 
   it("the client exposes the resources of the specification", () => {

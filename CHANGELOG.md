@@ -4,6 +4,24 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/) (while the version is 0.x, a minor release may change the API).
 
+## [0.2.0] - Unreleased
+
+`locale` on checkouts; webhook signature verification.
+
+### Added
+
+- `checkouts.create` accepts `locale` (`"fr"`, `"en"` or `"nl"`): the language of the hosted payment page, the receipt and
+  the e-mails of the order. It is not sent when absent.
+- `webhooks.constructEvent(rawBody, signatureHeader, secret, options?)`: verifies the `GameCoin-Signature` header of a
+  webhook call (HMAC-SHA256, every `v1` compared in constant time, timestamp tolerance of 5 minutes by default) and returns
+  a typed `WebhookEvent`. A pure function: no client, no network. Options: `toleranceSeconds` (`0` disables the check) and
+  `now` (injectable clock).
+- `WebhookSignatureError` (not a `GameCoinError`) with a `reason`: `missing_header`, `malformed_header`,
+  `no_matching_signature`, `timestamp_out_of_tolerance` or `invalid_payload`.
+- Event types as the `WebhookEventType` constants (`order.fulfilled`, `order.refunded`, `order.chargeback`,
+  `wallet.credited`, `webhook.test`); an unknown type is passed through with `data` untyped; `isKnownWebhookEvent` narrows.
+- `examples/webhook-server.mjs`, an Express receiver.
+
 ## [0.1.0] - Unreleased
 
 First release: the server SDK of the GameCoin API v1.

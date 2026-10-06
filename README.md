@@ -4,6 +4,7 @@ Server SDK for [Apilow GameCoin](https://gamecoin.apilow.com), the bank of your 
 the inventory and the sales of your web or mobile game. Use it from your game backend, with a **secret key**.
 
 - Whole server API: catalog, players, wallet, ledger, inventory, purchases, checkouts, orders and refunds.
+- Webhook signature verification: one pure function, no client needed.
 - Safe to retry: every state-changing call carries an idempotency key, and failures are retried for you.
 - Zero runtime dependencies (built-in `fetch`), Node 18 or later, ESM and CommonJS, TypeScript types included.
 - The secret key never shows up in an error, a log line or a string representation of the client.
@@ -159,6 +160,7 @@ const checkout = await gamecoin.checkouts.create(player, {
   successUrl: "https://example.com/shop/thanks", // where the player goes after paying
   cancelUrl: "https://example.com/shop",
   country: "BE", // the buyer's country decides the VAT (EU countries only)
+  locale: "en", // language of the payment page, the receipt and the e-mails: "fr", "en" or "nl"
 });
 console.log(checkout.order.status, checkout.checkoutUrl); // "pending" "https://…/pay/<order id>?t=…"
 
@@ -184,6 +186,80 @@ try {
 
 A refund has no idempotency key, so it is retried on `429` only. After a network error, a timeout or a `5xx` the SDK
 raises, and you read the order back with `orders.get` before trying again.
+
+## Webhooks
+
+GameCoin calls your server when an order is delivered, refunded or disputed. Every call is signed with the secret of
+the endpoint (`whsec_gc_…`, shown once in the dashboard). `webhooks.constructEvent` checks the signature and the age
+of the call, and returns the typed event. It needs no client and makes no request:
+
+```js
+import express from "express";
+import { WebhookEventType, WebhookSignatureError, isKnownWebhookEvent, webhooks } from "@apilow/gamecoin";
+
+const app = express();
+
+// The signature covers the body exactly as received: read it as raw bytes, never through express.json().
+app.post("/gamecoin/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  let event;
+  try {
+    event = webhooks.constructEvent(req.body, req.get("GameCoin-Signature"), process.env.GAMECOIN_WEBHOOK_SECRET);
+  } catch (error) {
+    if (error instanceof WebhookSignatureError) return res.sendStatus(400); // not from GameCoin, or replayed
+    throw error;
+  }
+
+  if (await alreadyProcessed(event.id)) return res.sendStatus(200); // GameCoin can send an event twice
+
+  if (isKnownWebhookEvent(event) && event.type === WebhookEventType.ORDER_FULFILLED) {
+    await unlockPurchase(event.data.playerId, event.data.pack.sku); // event.data is the order
+  }
+  await markProcessed(event.id);
+  res.sendStatus(200); // any 2xx within 10 seconds
+});
+```
+
+> **Pass the raw body.** A body that was parsed and serialised again can differ by one character, and the signature
+> then fails. `constructEvent` takes the raw body as a string or as bytes (`Buffer`, `Uint8Array`) and refuses a parsed
+> object with a `TypeError`. With Express, use `express.raw({ type: "application/json" })` on this route, and no global
+> `express.json()` before it. A runnable server is in [`examples/webhook-server.mjs`](examples/webhook-server.mjs).
+
+`webhooks.constructEvent(rawBody, signatureHeader, secret, options?)` checks, in this order: the header
+(`t=<unix seconds>,v1=<hex>[,v1=<hex>…]`), the HMAC-SHA256 of `<t>.<rawBody>` (every `v1` is compared, in constant time),
+the timestamp, then the JSON envelope. Options:
+
+| Option | Meaning |
+|---|---|
+| `toleranceSeconds` | Largest gap between the signed timestamp and your clock, in either direction. Default `300`; `0` turns the check off. |
+| `now` | Your own clock, for tests: a function that returns a `Date` or milliseconds since the epoch. |
+
+On failure it throws a `WebhookSignatureError` (not a `GameCoinError`) whose `reason` is one of:
+
+| `reason` | When |
+|---|---|
+| `missing_header` | No `GameCoin-Signature` header |
+| `malformed_header` | No valid `t` or no `v1` in it |
+| `no_matching_signature` | Wrong secret, or the body changed |
+| `timestamp_out_of_tolerance` | Signed, but older or newer than the tolerance: a replayed call |
+| `invalid_payload` | Signed, but not JSON or not an event |
+
+Answer `400` to every one of them. The error never contains the secret, the body or a signature. An empty `secret` or a
+parsed object instead of the raw body is a bug in your code: it throws `RangeError` or `TypeError`, not a
+`WebhookSignatureError`.
+
+The event is `{ id, type, createdAt, env, data }`, with `createdAt` as a `Date` and `env` the environment (`"test"` or
+`"live"`) that sent the call. Use `event.id` to process an event once. `WebhookEventType` holds the types:
+
+| Constant | `type` | `data` |
+|---|---|---|
+| `ORDER_FULFILLED` | `order.fulfilled` | the `Order`, as `orders.get` returns it |
+| `ORDER_REFUNDED` | `order.refunded` | the `Order` |
+| `ORDER_CHARGEBACK` | `order.chargeback` | the `Order` |
+| `WALLET_CREDITED` | `wallet.credited` | `{ playerId, orderId, credits: [{ currency, paid, bonus }] }` |
+| `WEBHOOK_TEST` | `webhook.test` | `{ message }` |
+
+An event of another type (GameCoin may add some) is returned as it is, with `data` untyped, instead of failing.
+`isKnownWebhookEvent(event)` tells the two apart, and narrows `event` for TypeScript.
 
 ## Idempotency and retries
 

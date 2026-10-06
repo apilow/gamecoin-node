@@ -20,9 +20,9 @@ export class CheckoutsResource {
   async create(player: PlayerRef, params: CheckoutParams, options?: MutationOptions): Promise<Checkout> {
     const path = playerPath(player, "/checkouts");
     const fields = requireObject(params, "params");
-    assertKnownKeys(fields, ["packSku", "successUrl", "cancelUrl", "country"], "params");
+    assertKnownKeys(fields, ["packSku", "successUrl", "cancelUrl", "country", "locale"], "params");
     const body: Record<string, string> = { packSku: requireString(fields.packSku, "params.packSku") };
-    for (const key of ["successUrl", "cancelUrl", "country"] as const) {
+    for (const key of ["successUrl", "cancelUrl", "country", "locale"] as const) {
       const value = optionalString(fields[key], `params.${key}`);
       if (value !== undefined) body[key] = value;
     }

@@ -21,3 +21,18 @@ async function main(): Promise<void> {
 }
 
 void main;
+
+// v0.2: the webhook helpers through `require`.
+const { webhooks, WebhookSignatureError, WebhookEventType } = gamecoinSdk;
+
+function handleWebhook(rawBody: string, signature: string): string {
+  try {
+    const event: gamecoinSdk.WebhookEvent = webhooks.constructEvent(rawBody, signature, "whsec_gc_x");
+    return event.type === WebhookEventType.WEBHOOK_TEST ? "test" : event.id;
+  } catch (error) {
+    if (error instanceof WebhookSignatureError) return error.reason;
+    throw error;
+  }
+}
+
+void handleWebhook;

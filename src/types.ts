@@ -217,6 +217,11 @@ export interface CheckoutParams {
   cancelUrl?: string;
   /** ISO alpha-2 country of the buyer, which decides the VAT (EU only). Defaults to the player's country, then `"BE"`. */
   country?: string;
+  /**
+   * Language of the hosted payment page, the receipt and the e-mails of the order: `"fr"`, `"en"` or `"nl"`. The API
+   * ignores any other value. A pending order that the API reuses takes the language of the latest request.
+   */
+  locale?: "fr" | "en" | "nl" | (string & {});
 }
 
 export interface RefundParams {
@@ -277,4 +282,60 @@ export interface GameCoinOptions {
   fetch?: FetchFunction;
   /** Custom wait between retries, for tests. Defaults to a timer. */
   sleep?: SleepFunction;
+}
+
+// --- Webhooks ----------------------------------------------------------------------------------------------
+
+/** The event types this SDK knows. See the `WebhookEventType` constants. */
+export type KnownWebhookEventType = "order.fulfilled" | "order.refunded" | "order.chargeback" | "wallet.credited" | "webhook.test";
+
+/** `data` of `wallet.credited`: who received what, after an order was delivered. */
+export interface WalletCreditedData {
+  playerId: string;
+  orderId: string;
+  credits: { currency: string; paid: number; bonus: number }[];
+}
+
+interface WebhookEventBase {
+  /** The same for the same event, even when GameCoin sends it again: use it to process an event once. */
+  id: string;
+  createdAt: Date;
+  env: Environment;
+}
+
+export interface OrderWebhookEvent extends WebhookEventBase {
+  type: "order.fulfilled" | "order.refunded" | "order.chargeback";
+  /** The order, as `orders.get` returns it. */
+  data: Order;
+}
+
+export interface WalletCreditedWebhookEvent extends WebhookEventBase {
+  type: "wallet.credited";
+  data: WalletCreditedData;
+}
+
+export interface TestWebhookEvent extends WebhookEventBase {
+  type: "webhook.test";
+  data: { message: string };
+}
+
+/** An event of a type that this version of the SDK does not know: passed through, `data` as received. */
+export interface UnknownWebhookEvent extends WebhookEventBase {
+  type: string;
+  data: unknown;
+}
+
+/** The events of a known type. `isKnownWebhookEvent(event)` narrows a {@link WebhookEvent} to it. */
+export type KnownWebhookEvent = OrderWebhookEvent | WalletCreditedWebhookEvent | TestWebhookEvent;
+
+/** A verified webhook event. */
+export type WebhookEvent = KnownWebhookEvent | UnknownWebhookEvent;
+
+
+/** Options of `webhooks.constructEvent`. */
+export interface ConstructEventOptions {
+  /** Largest gap, in seconds, between the signed timestamp and the clock, in either direction. Defaults to 300; 0 turns the check off. */
+  toleranceSeconds?: number;
+  /** The clock, for tests: the current time as a `Date` or as milliseconds since the epoch. */
+  now?: () => Date | number;
 }

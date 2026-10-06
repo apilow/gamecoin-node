@@ -3,6 +3,8 @@ export { ErrorCode, GameCoinError } from "./errors.js";
 export type { GameCoinErrorInit } from "./errors.js";
 export { ext } from "./player.js";
 export { VERSION } from "./version.js";
+export { DEFAULT_WEBHOOK_TOLERANCE_SECONDS, WebhookEventType, WebhookSignatureError, isKnownWebhookEvent, webhooks } from "./webhooks.js";
+export type { WebhookSignatureReason } from "./webhooks.js";
 
 export type { CatalogResource } from "./resources/catalog.js";
 export type { CheckoutsResource } from "./resources/checkouts.js";
@@ -18,6 +20,7 @@ export type {
   Catalog,
   Checkout,
   CheckoutParams,
+  ConstructEventOptions,
   Currency,
   Environment,
   FetchFunction,
@@ -29,6 +32,8 @@ export type {
   Item,
   ItemQuantityParams,
   ItemType,
+  KnownWebhookEvent,
+  KnownWebhookEventType,
   LedgerEntry,
   LedgerEntryType,
   LedgerIterateParams,
@@ -38,6 +43,7 @@ export type {
   MutationOptions,
   Order,
   OrderStatus,
+  OrderWebhookEvent,
   Pack,
   Player,
   PlayerKind,
@@ -48,6 +54,11 @@ export type {
   RefundParams,
   RequestOptions,
   SleepFunction,
+  TestWebhookEvent,
+  UnknownWebhookEvent,
   Wallet,
+  WalletCreditedData,
+  WalletCreditedWebhookEvent,
   WalletMovementParams,
+  WebhookEvent,
 } from "./types.js";

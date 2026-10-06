@@ -1,10 +1,10 @@
 // Run by scripts/check-package.mjs: the built package, loaded with `require` the way a CommonJS program does it.
 const assert = require("node:assert/strict");
 const sdk = require("@apilow/gamecoin");
-const { ErrorCode, GameCoin, GameCoinError, VERSION, ext } = sdk;
+const { ErrorCode, GameCoin, GameCoinError, VERSION, WebhookSignatureError, ext, webhooks } = sdk;
 
 async function main() {
-  assert.deepEqual(Object.keys(sdk).sort(), ["DEFAULT_BASE_URL", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_MS", "ErrorCode", "GameCoin", "GameCoinError", "VERSION", "ext"]);
+  assert.deepEqual(Object.keys(sdk).sort(), ["DEFAULT_BASE_URL", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_MS", "DEFAULT_WEBHOOK_TOLERANCE_SECONDS", "ErrorCode", "GameCoin", "GameCoinError", "VERSION", "WebhookEventType", "WebhookSignatureError", "ext", "isKnownWebhookEvent", "webhooks"]);
   assert.equal(typeof GameCoin, "function");
   assert.equal(ext("user-42"), "ext:user-42");
   assert.equal(require("@apilow/gamecoin/package.json").version, VERSION);
@@ -34,6 +34,22 @@ async function main() {
   assert.ok(!(error instanceof GameCoinError), "another copy of the class");
   assert.ok(GameCoinError.isGameCoinError(error));
   assert.ok(esm.GameCoinError.isGameCoinError(error));
+
+  // Webhook verification through the CommonJS build; the error is recognised across copies.
+  const { createHmac } = require("node:crypto");
+  const hookBody = JSON.stringify({ id: "evt_1", type: "webhook.test", createdAt: "2026-10-06T10:00:00.000Z", env: "test", data: { message: "hi" } });
+  const stamp = Math.floor(Date.now() / 1000);
+  const hookHeader = `t=${stamp},v1=${createHmac("sha256", "whsec_gc_smoke").update(`${stamp}.${hookBody}`).digest("hex")}`;
+  assert.equal(webhooks.constructEvent(Buffer.from(hookBody), hookHeader, "whsec_gc_smoke").data.message, "hi");
+  const refused = (() => {
+    try {
+      esm.webhooks.constructEvent(hookBody, "t=1,v1=00", "whsec_gc_smoke");
+    } catch (e) {
+      return e;
+    }
+  })();
+  assert.ok(!(refused instanceof WebhookSignatureError), "another copy of the class");
+  assert.ok(WebhookSignatureError.isWebhookSignatureError(refused));
 
   console.log(`CommonJS ok: const { GameCoin, ext, GameCoinError } = require("@apilow/gamecoin") (version ${VERSION})`);
 }

@@ -2,6 +2,7 @@ import type {
   Balance,
   Catalog,
   Currency,
+  Environment,
   InventoryItem,
   Item,
   LedgerEntry,
@@ -11,6 +12,7 @@ import type {
   Player,
   PlayerToken,
   Wallet,
+  WalletCreditedData,
 } from "./types.js";
 
 /**
@@ -259,4 +261,35 @@ export function parsePurchase(value: unknown): { entry: LedgerEntry; balance: Ba
 export function parseCheckout(value: unknown): { order: Order; checkoutUrl: string } {
   const o = obj(value, "response");
   return { order: parseOrder(o.order, "response.order"), checkoutUrl: str(o, "checkoutUrl", "response") };
+}
+
+// --- Webhook events ----------------------------------------------------------------------------------------
+
+export function parseWalletCreditedData(value: unknown, path = "event.data"): WalletCreditedData {
+  const o = obj(value, path);
+  return {
+    playerId: str(o, "playerId", path),
+    orderId: str(o, "orderId", path),
+    credits: list(o, "credits", path, (credit, creditPath) => {
+      const c = obj(credit, creditPath);
+      return { currency: str(c, "currency", creditPath), paid: int(c, "paid", creditPath), bonus: int(c, "bonus", creditPath) };
+    }),
+  };
+}
+
+export function parseTestEventData(value: unknown, path = "event.data"): { message: string } {
+  return { message: str(obj(value, path), "message", path) };
+}
+
+/** The envelope shared by every event: the `data` is left to the caller, which knows the type. */
+export function parseWebhookEnvelope(value: unknown): { id: string; type: string; createdAt: Date; env: Environment; data: unknown } {
+  const o = obj(value, "event");
+  if (!("data" in o)) throw new ShapeError("event.data", "present");
+  return {
+    id: str(o, "id", "event"),
+    type: str(o, "type", "event"),
+    createdAt: date(o, "createdAt", "event"),
+    env: tag<Environment>(o, "env", "event"),
+    data: o.data,
+  };
 }

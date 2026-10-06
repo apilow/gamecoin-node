@@ -39,3 +39,25 @@ await gamecoin.wallet.grant(player, { currency: "gems", amount: 1, paid: 1 });
 await gamecoin.wallet.get(player, { idempotencyKey: "k" });
 
 void [replayed, createdAt, paidAt];
+
+// v0.2: locale on checkouts, and the webhook helpers.
+import { WebhookEventType, WebhookSignatureError, isKnownWebhookEvent, webhooks, type WebhookEvent } from "@apilow/gamecoin";
+
+await gamecoin.checkouts.create(player, { packSku: "gems-500", locale: "fr" });
+
+function handle(rawBody: Buffer, signature: string | undefined): string {
+  try {
+    const event: WebhookEvent = webhooks.constructEvent(rawBody, signature, "whsec_gc_x", { toleranceSeconds: 600, now: () => Date.now() });
+    if (isKnownWebhookEvent(event) && event.type === WebhookEventType.ORDER_FULFILLED) {
+      const sku: string = event.data.pack.sku;
+      return sku;
+    }
+    if (isKnownWebhookEvent(event) && event.type === "wallet.credited") return event.data.credits[0]?.currency ?? "";
+    return event.id;
+  } catch (error) {
+    if (error instanceof WebhookSignatureError) return error.reason;
+    throw error;
+  }
+}
+
+void handle;
