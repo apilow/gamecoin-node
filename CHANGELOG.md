@@ -25,8 +25,11 @@ Gift codes; creator code on checkouts; pack availability.
 
 ### Changed
 
-- The response parsers are strict on the new fields: a catalog without `prelaunch` / `launchAt` or a pack without
-  `availability` is an `INVALID_RESPONSE`. This version needs the GameCoin API of sprint 3 or later.
+- The four fields added in 0.3 are tolerated when absent (SDK-SPEC section 10.1): `Pack.availability` reads as `null`,
+  `Catalog.prelaunch` as `false`, `Catalog.launchAt` as `null` and `Order.creatorCode` as `null`, so an older server or a
+  webhook event queued before 0.3 stays readable. A field that is present with the wrong type or shape (an `availability`
+  without `founder`, a `creatorCode` without `creatorName`, an unreadable date) is still an `INVALID_RESPONSE`
+  (`invalid_payload` for a webhook event).
 
 ## [0.2.0] - Unreleased
 

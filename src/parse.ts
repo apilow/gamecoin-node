@@ -193,7 +193,8 @@ function parsePack(value: unknown, path: string): Pack {
     }),
     badge: strOrNull(o, "badge", path),
     maxPerPlayer: intOrNull(o, "maxPerPlayer", path),
-    availability: o.availability === null ? null : parseAvailability(o.availability, `${path}.availability`),
+    // Absent reads as null (spec 10.1): a pack from a server older than 0.3 is an ordinary pack.
+    availability: o.availability === null || o.availability === undefined ? null : parseAvailability(o.availability, `${path}.availability`),
   };
 }
 
@@ -213,8 +214,9 @@ export function parseCatalog(value: unknown, path = "catalog"): Catalog {
     currencies: list(o, "currencies", path, parseCurrency),
     items: list(o, "items", path, parseItem),
     packs: list(o, "packs", path, parsePack),
-    prelaunch: bool(o, "prelaunch", path),
-    launchAt: dateOrNull(o, "launchAt", path),
+    // Absent reads as false / null (spec 10.1); present with the wrong type is still a ShapeError.
+    prelaunch: o.prelaunch === undefined ? false : bool(o, "prelaunch", path),
+    launchAt: o.launchAt === undefined ? null : dateOrNull(o, "launchAt", path),
   };
 }
 
@@ -236,7 +238,7 @@ export function parseOrder(value: unknown, path = "order"): Order {
     paidAt: dateOrNull(o, "paidAt", path),
     fulfilledAt: dateOrNull(o, "fulfilledAt", path),
     refundedAt: dateOrNull(o, "refundedAt", path),
-    // Absent reads as null: a webhook event stored before creator codes existed is sent again as it was.
+    // Absent reads as null (spec 10.1): a webhook event stored before creator codes existed is sent again as it was.
     creatorCode: o.creatorCode === null || o.creatorCode === undefined ? null : parseCreatorCode(o.creatorCode, `${path}.creatorCode`),
   };
 }

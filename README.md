@@ -156,6 +156,8 @@ console.log(purchase.balance.total, purchase.item.quantity, purchase.entry.ref.i
 on sale, no limit), otherwise `{ startsAt, endsAt, remaining, founder }` with the dates as `Date` or `null` and `remaining` the
 units left (`null` for an unlimited stock). The catalog also lists scheduled, ended and sold-out packs: your shop decides what
 to show. While the game is in pre-launch, `catalog.prelaunch` is `true` and `catalog.launchAt` holds the launch date.
+A server that does not send these fields yet (older than 0.3) reads as: `availability` `null`, `prelaunch` `false`, `launchAt` `null`;
+a field that is present with the wrong type or shape is an `INVALID_RESPONSE`.
 
 ```js
 const catalog = await gamecoin.catalog.get();

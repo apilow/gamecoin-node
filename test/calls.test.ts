@@ -509,11 +509,35 @@ describe("responses become typed objects", () => {
     assert.equal(plain.launchAt, null);
   });
 
+  it("reads an absent Pack.availability as null, an absent Catalog.prelaunch as false and an absent Catalog.launchAt as null", async () => {
+    const pack = { sku: "a", name: "A", description: null, priceCents: 1, currency: "EUR", grants: [], items: [], badge: null, maxPerPlayer: null };
+    const { prelaunch: _p, launchAt: _l, ...bare } = emptyCatalogJson as Record<string, unknown>;
+    const noAvailability = await harness({ json: { ...emptyCatalogJson, packs: [pack] } }).gamecoin.catalog.get();
+    assert.equal(noAvailability.packs[0]?.availability, null);
+    const noPrelaunch = await harness({ json: { ...bare, launchAt: LATER } }).gamecoin.catalog.get();
+    assert.equal(noPrelaunch.prelaunch, false);
+    assert.equal(noPrelaunch.launchAt?.toISOString(), LATER);
+    const noLaunchAt = await harness({ json: { ...bare, prelaunch: true } }).gamecoin.catalog.get();
+    assert.equal(noLaunchAt.prelaunch, true);
+    assert.equal(noLaunchAt.launchAt, null);
+    const neither = await harness({ json: bare }).gamecoin.catalog.get();
+    assert.equal(neither.prelaunch, false);
+    assert.equal(neither.launchAt, null);
+  });
+
+  it("reads an absent Order.creatorCode as null", async () => {
+    const { creatorCode: _c, ...bare } = orderJson as Record<string, unknown>;
+    assert.equal((await harness({ json: bare }).gamecoin.orders.get(ID_ORDER)).creatorCode, null);
+  });
+
   it("rejects a catalog or an availability of the wrong shape as INVALID_RESPONSE", async () => {
     const pack = { sku: "a", name: "A", description: null, priceCents: 1, currency: "EUR", grants: [], items: [], badge: null, maxPerPlayer: null };
     const bad: unknown[] = [
       { ...emptyCatalogJson, prelaunch: "yes" },
       { ...emptyCatalogJson, launchAt: "tomorrow" },
+      { ...emptyCatalogJson, prelaunch: null },
+      { ...emptyCatalogJson, launchAt: 12 },
+      { ...emptyCatalogJson, packs: [{ ...pack, availability: "always" }] },
       { ...emptyCatalogJson, packs: [{ ...pack, availability: { startsAt: null, endsAt: null, remaining: 1.5, founder: false } }] },
       { ...emptyCatalogJson, packs: [{ ...pack, availability: { startsAt: null, endsAt: null, remaining: null } }] },
       { ...emptyCatalogJson, packs: [{ ...pack, availability: { startsAt: "nope", endsAt: null, remaining: null, founder: false } }] },
