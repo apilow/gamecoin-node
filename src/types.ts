@@ -381,3 +381,128 @@ export interface ConstructEventOptions {
   /** The clock, for tests: the current time as a `Date` or as milliseconds since the epoch. */
   now?: () => Date | number;
 }
+
+// --- Catalog management ------------------------------------------------------------------------------------
+
+/** `archived` resources are no longer offered, creditable or buyable; balances, inventories and past orders are untouched. */
+export type CatalogStatus = "active" | "archived";
+/** A `draft` pack is not sold; an `active` one is; an `archived` one no longer is. */
+export type PackStatus = "draft" | "active" | "archived";
+
+/** A currency as `currencies` manages it: the catalog fields, the status and the dates. */
+export interface ManagedCurrency extends Currency {
+  status: CatalogStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ManagedItem extends Item {
+  status: CatalogStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** The sale settings of a pack, as written, with the number of units delivered. */
+export interface ManagedPackAvailability {
+  startsAt: Date | null;
+  endsAt: Date | null;
+  /** Total units that can be sold; `null` for an unlimited stock. */
+  stock: number | null;
+  founder: boolean;
+  /** Units delivered so far. */
+  sold: number;
+}
+
+export interface ManagedPack extends Omit<Pack, "availability"> {
+  sortOrder: number;
+  status: PackStatus;
+  availability: ManagedPackAvailability | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ListCatalogParams {
+  /** Also list the archived resources (left out by default). */
+  includeArchived?: boolean;
+}
+
+export interface CreateCurrencyParams {
+  /** A lowercase letter, then lowercase letters, digits or `_` (2 to 24 characters). Unique in the game and final. */
+  code: string;
+  name: string;
+  /** True (default) when packs can sell it for real money; false for a currency that is only given. */
+  purchasable?: boolean;
+}
+
+export interface UpdateCurrencyParams {
+  name?: string;
+  purchasable?: boolean;
+}
+
+export interface CreateItemParams {
+  /** Unique in the game and final. */
+  sku: string;
+  name: string;
+  description?: string | null;
+  /** `consumable` can be consumed; `durable` is owned. Final. */
+  type: ItemType;
+  /** In an active currency of the game; leave out for an item that cannot be bought with currency. */
+  price?: { currency: string; amount: number } | null;
+  /** Most units per player. Left out: 1 for a durable item, no limit for a consumable; `null`: no limit. */
+  maxOwned?: number | null;
+  /** True when the browser SDK may sell the item (needs a price). */
+  clientPurchasable?: boolean;
+  metadata?: Record<string, string>;
+}
+
+/** A field left out is unchanged; `null` clears the description, the price or the limit. */
+export interface UpdateItemParams {
+  name?: string;
+  description?: string | null;
+  price?: { currency: string; amount: number } | null;
+  maxOwned?: number | null;
+  clientPurchasable?: boolean;
+  /** Replaces the whole metadata object. */
+  metadata?: Record<string, string>;
+}
+
+/** What you write of the availability of a pack: dates as `Date`s or ISO 8601 texts. A field left out is `null` (`founder`: `false`). */
+export interface PackAvailabilityParams {
+  startsAt?: Date | string | null;
+  endsAt?: Date | string | null;
+  stock?: number | null;
+  founder?: boolean;
+}
+
+export interface CreatePackParams {
+  /** Unique in the game and final. */
+  sku: string;
+  name: string;
+  description?: string | null;
+  /** Euro cents, VAT included: 50 to 50,000. */
+  priceCents: number;
+  grants?: { currency: string; amount: number; bonus: number }[];
+  items?: { sku: string; quantity: number }[];
+  badge?: "popular" | "best_value" | null;
+  maxPerPlayer?: number | null;
+  sortOrder?: number;
+  availability?: PackAvailabilityParams | null;
+  /** `draft` (default) or `active` (sold at once). */
+  status?: "draft" | "active";
+}
+
+/** A field left out is unchanged. `grants`, `items` and `availability` replace the previous value as a whole. */
+export interface UpdatePackParams {
+  name?: string;
+  description?: string | null;
+  priceCents?: number;
+  grants?: { currency: string; amount: number; bonus: number }[];
+  items?: { sku: string; quantity: number }[];
+  badge?: "popular" | "best_value" | null;
+  maxPerPlayer?: number | null;
+  sortOrder?: number;
+  /** The whole availability; `{}` removes every limit. */
+  availability?: PackAvailabilityParams;
+  /** Applied after the rest of the change. */
+  status?: PackStatus;
+}

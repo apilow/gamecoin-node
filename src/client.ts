@@ -2,9 +2,12 @@ import { HttpClient, defaultSleep } from "./http.js";
 import { CatalogResource } from "./resources/catalog.js";
 import { CheckoutsResource } from "./resources/checkouts.js";
 import { CodesResource } from "./resources/codes.js";
+import { CurrenciesResource } from "./resources/currencies.js";
 import { InventoryResource } from "./resources/inventory.js";
+import { ItemsResource } from "./resources/items.js";
 import { LedgerResource } from "./resources/ledger.js";
 import { OrdersResource } from "./resources/orders.js";
+import { PacksResource } from "./resources/packs.js";
 import { PlayersResource } from "./resources/players.js";
 import { PurchasesResource } from "./resources/purchases.js";
 import { WalletResource } from "./resources/wallet.js";
@@ -38,6 +41,10 @@ export class GameCoin {
   /** The base URL in use, without a trailing slash and without `/api/v1`. */
   readonly baseUrl: string;
   readonly catalog: CatalogResource;
+  /** Manage the currencies, items and packs of the game (the catalog is shared by `test` and `live`). */
+  readonly currencies: CurrenciesResource;
+  readonly items: ItemsResource;
+  readonly packs: PacksResource;
   readonly players: PlayersResource;
   readonly wallet: WalletResource;
   readonly ledger: LedgerResource;
@@ -84,6 +91,9 @@ export class GameCoin {
       sleep: resolveFunction(settings.sleep, "options.sleep") ?? defaultSleep,
     });
     this.catalog = new CatalogResource(http);
+    this.currencies = new CurrenciesResource(http);
+    this.items = new ItemsResource(http);
+    this.packs = new PacksResource(http);
     this.players = new PlayersResource(http);
     this.wallet = new WalletResource(http);
     this.ledger = new LedgerResource(http);

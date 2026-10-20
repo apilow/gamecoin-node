@@ -20,7 +20,7 @@ export interface HttpConfig {
 }
 
 export interface RequestSpec {
-  method: "GET" | "POST" | "PUT";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /** Path under `/api/v1`, already URL-encoded. */
   path: string;
   query?: Record<string, string | number | undefined>;

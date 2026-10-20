@@ -4,6 +4,7 @@ Server SDK for [Apilow GameCoin](https://gamecoin.apilow.com), the bank of your 
 the inventory and the sales of your web or mobile game. Use it from your game backend, with a **secret key**.
 
 - Whole server API: catalog, players, wallet, ledger, inventory, purchases, checkouts, gift codes, orders and refunds.
+- Catalog management, like the products and prices of a payment platform: create, change and archive currencies, items and packs.
 - Webhook signature verification: one pure function, no client needed.
 - Safe to retry: every state-changing call carries an idempotency key, and failures are retried for you.
 - Zero runtime dependencies (built-in `fetch`), Node 18 or later, ESM and CommonJS, TypeScript types included.
@@ -149,6 +150,43 @@ console.log(owned.map((item) => `${item.sku} x${item.quantity}`));
 const purchase = await gamecoin.purchases.create(player, { sku: "potion" });
 console.log(purchase.balance.total, purchase.item.quantity, purchase.entry.ref.itemSku); // ... ... "potion"
 ```
+
+## Manage the catalog
+
+`currencies`, `items` and `packs` create, change and archive the catalog, the way a payment platform manages its products and
+prices. Each has `create`, `get`, `update`, `archive` and `list`.
+
+> The catalog is shared by the `test` and `live` environments of the game: a pack created with a test key exists for live keys
+> too. Create a new pack as a draft (the default) and turn it on with `status: "active"` when it is ready.
+
+```js
+await gamecoin.currencies.create({ code: "rubies", name: "Rubies" });
+await gamecoin.items.create({ sku: "elixir", name: "Elixir", type: "consumable", price: { currency: "gems", amount: 15 } });
+
+const pack = await gamecoin.packs.create({
+  sku: "mega",
+  name: "Mega pack",
+  priceCents: 999,
+  grants: [{ currency: "gems", amount: 1200, bonus: 100 }],
+  items: [{ sku: "elixir", quantity: 2 }],
+});
+console.log(pack.status); // "draft"
+
+await gamecoin.packs.update("mega", {
+  priceCents: 1099,
+  availability: { startsAt: new Date("2026-11-01T00:00:00Z"), stock: 500, founder: true }, // replaces the whole availability
+  status: "active",
+});
+await gamecoin.items.update("elixir", { price: null }); // null clears a description, a price or a limit
+await gamecoin.packs.archive("mega"); // nothing is deleted
+const everything = await gamecoin.packs.list({ includeArchived: true });
+```
+
+Identifiers (`code`, `sku`) and the `type` of an item are final. A taken one is `CONFLICT` with `details.fieldErrors.sku`
+equal to `["SKU_TAKEN"]` (`["CODE_TAKEN"]` for a currency); an invalid pack is `VALIDATION_FAILED` with the faulty lines in
+`details.fieldErrors`; archiving something that an active pack still uses is `CONFLICT` with `details.blockedBy`. A create has
+no idempotency key (the identifier is its natural key), so it is retried on `429` only: after a network error, a timeout or a
+`5xx`, read the resource back with `get` before you try again.
 
 ## Checkout, orders and refunds
 

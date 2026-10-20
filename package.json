@@ -1,6 +1,6 @@
 {
   "name": "@apilow/gamecoin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Server SDK for Apilow GameCoin: the bank of your game (virtual currency, inventory and sales).",
   "keywords": [
     "gamecoin",

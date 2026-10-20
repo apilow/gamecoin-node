@@ -4,6 +4,28 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/) (while the version is 0.x, a minor release may change the API).
 
+## [0.4.0] - Unreleased
+
+Catalog management: create, change and archive currencies, items and packs.
+
+### Added
+
+- Three resources, `currencies`, `items` and `packs`, each with `create`, `get`, `update`, `archive` and `list`: the catalog
+  management API (`/currencies`, `/items`, `/packs`). Twelve resources and thirty-two calls in all.
+- Results `ManagedCurrency`, `ManagedItem` and `ManagedPack`: the catalog objects plus `status`, `createdAt` and `updatedAt`
+  (a pack also has `sortOrder` and `availability` as `{ startsAt, endsAt, stock, founder, sold }`). The matching `*Params`
+  types, `ListCatalogParams`, `PackAvailabilityParams`, `CatalogStatus` and `PackStatus`.
+- `archive` returns the archived resource; `list` leaves archived ones out unless `{ includeArchived: true }`.
+- `availability` accepts `Date`s or ISO 8601 texts; a field left out is `null` (`founder`: `false`).
+
+### Notes
+
+- The catalog is shared by the `test` and `live` environments of the game: a resource created with a test key exists for live
+  keys too.
+- A create has no idempotency key (the code or sku is its natural key; a taken one is `CONFLICT` with `SKU_TAKEN` or
+  `CODE_TAKEN`), so it is retried on `429` only, like `orders.refund`. Updates, archives and reads follow the usual retry rules.
+- An update that names an identifier (`code`, `sku`) or an item `type` is refused before any request.
+
 ## [0.3.0] - Unreleased
 
 Gift codes; creator code on checkouts; pack availability.

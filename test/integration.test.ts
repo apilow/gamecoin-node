@@ -211,3 +211,78 @@ describe("integration: sandbox game", { skip: ready ? false : "set GAMECOIN_BASE
     assert.equal((await gamecoin.players.get(odd)).id, created.id);
   });
 });
+
+describe("integration: catalog management", { skip: ready ? false : "set GAMECOIN_BASE_URL and GAMECOIN_SECRET_KEY to run it" }, () => {
+  let gamecoin: GameCoin;
+  // A fresh suffix for every run: a code or a sku is never reusable, even once archived.
+  const suffix = randomUUID().replace(/-/g, "").slice(0, 10);
+  const code = `ruby_${suffix}`;
+  const itemSku = `elixir-${suffix}`;
+  const packSku = `mega-${suffix}`;
+
+  before(() => {
+    gamecoin = new GameCoin(process.env.GAMECOIN_SECRET_KEY as string, { baseUrl: process.env.GAMECOIN_BASE_URL as string });
+  });
+
+  it("creates, changes, lists and archives a currency, an item and a pack", async () => {
+    const currency = await gamecoin.currencies.create({ code, name: "Ruby", purchasable: true });
+    assert.equal(currency.status, "active");
+    assert.ok(currency.createdAt instanceof Date);
+    assert.equal((await gamecoin.currencies.update(code, { name: "Red ruby" })).name, "Red ruby");
+
+    const item = await gamecoin.items.create({ sku: itemSku, name: "Elixir", type: "consumable", price: { currency: code, amount: 15 }, clientPurchasable: true, metadata: { heal: "30" } });
+    assert.deepEqual(item.price, { currency: code, amount: 15 });
+    assert.equal((await gamecoin.items.update(itemSku, { price: { currency: code, amount: 25 } })).price?.amount, 25);
+
+    const pack = await gamecoin.packs.create({
+      sku: packSku,
+      name: "Mega pack",
+      priceCents: 999,
+      grants: [{ currency: code, amount: 1200, bonus: 100 }],
+      items: [{ sku: itemSku, quantity: 2 }],
+      badge: "best_value",
+    });
+    assert.equal(pack.status, "draft");
+    assert.equal(pack.availability, null);
+
+    const live = await gamecoin.packs.update(packSku, {
+      priceCents: 1099,
+      status: "active",
+      availability: { startsAt: new Date("2030-01-01T00:00:00Z"), stock: 50, founder: true },
+    });
+    assert.equal(live.status, "active");
+    assert.deepEqual(live.availability, { startsAt: new Date("2030-01-01T00:00:00Z"), endsAt: null, stock: 50, founder: true, sold: 0 });
+
+    const catalog = await gamecoin.catalog.get();
+    assert.equal(catalog.packs.find((p) => p.sku === packSku)?.availability?.remaining, 50);
+    assert.ok((await gamecoin.items.list()).some((i) => i.sku === itemSku));
+
+    // Archiving goes top-down: a pack, then the item it holds, then the currency.
+    assert.equal((await gamecoin.packs.archive(packSku)).status, "archived");
+    assert.equal((await gamecoin.items.archive(itemSku)).status, "archived");
+    assert.equal((await gamecoin.currencies.archive(code)).status, "archived");
+    assert.equal((await gamecoin.currencies.archive(code)).status, "archived");
+    assert.equal((await gamecoin.currencies.get(code)).status, "archived");
+
+    assert.ok(!(await gamecoin.currencies.list()).some((c) => c.code === code));
+    assert.ok((await gamecoin.currencies.list({ includeArchived: true })).some((c) => c.code === code));
+    const left = await gamecoin.catalog.get();
+    assert.ok(!left.currencies.some((c) => c.code === code) && !left.packs.some((p) => p.sku === packSku));
+  });
+
+  it("answers CONFLICT, VALIDATION_FAILED and NOT_FOUND with their details", async () => {
+    const taken = await failure(gamecoin.currencies.create({ code: "gems", name: "Again" }));
+    assert.equal(taken.code, ErrorCode.CONFLICT);
+    assert.deepEqual(taken.details.fieldErrors, { code: ["CODE_TAKEN"] });
+
+    const blocked = await failure(gamecoin.currencies.archive("gems"));
+    assert.equal(blocked.code, ErrorCode.CONFLICT);
+    assert.ok(blocked.details.blockedBy);
+
+    const invalid = await failure(gamecoin.packs.create({ sku: `empty-${suffix}`, name: "Empty", priceCents: 500 }));
+    assert.equal(invalid.code, ErrorCode.VALIDATION_FAILED);
+    assert.ok(invalid.details.fieldErrors);
+
+    assert.equal((await failure(gamecoin.items.get(`nope-${suffix}`))).code, ErrorCode.NOT_FOUND);
+  });
+});

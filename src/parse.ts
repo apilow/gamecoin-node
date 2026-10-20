@@ -7,6 +7,10 @@ import type {
   Item,
   LedgerEntry,
   LedgerPage,
+  ManagedCurrency,
+  ManagedItem,
+  ManagedPack,
+  ManagedPackAvailability,
   Order,
   Pack,
   PackAvailability,
@@ -332,4 +336,52 @@ export function parseWebhookEnvelope(value: unknown): { id: string; type: string
     env: tag<Environment>(o, "env", "event"),
     data: o.data,
   };
+}
+
+// --- Catalog management ------------------------------------------------------------------------------------
+
+export function parseManagedCurrency(value: unknown, path = "currency"): ManagedCurrency {
+  const o = obj(value, path);
+  return { ...parseCurrency(o, path), status: tag<ManagedCurrency["status"]>(o, "status", path), createdAt: date(o, "createdAt", path), updatedAt: date(o, "updatedAt", path) };
+}
+
+export function parseManagedItem(value: unknown, path = "item"): ManagedItem {
+  const o = obj(value, path);
+  return { ...parseItem(o, path), status: tag<ManagedItem["status"]>(o, "status", path), createdAt: date(o, "createdAt", path), updatedAt: date(o, "updatedAt", path) };
+}
+
+function parseManagedAvailability(value: unknown, path: string): ManagedPackAvailability {
+  const o = obj(value, path);
+  return {
+    startsAt: dateOrNull(o, "startsAt", path),
+    endsAt: dateOrNull(o, "endsAt", path),
+    stock: intOrNull(o, "stock", path),
+    founder: bool(o, "founder", path),
+    sold: int(o, "sold", path),
+  };
+}
+
+export function parseManagedPack(value: unknown, path = "pack"): ManagedPack {
+  const o = obj(value, path);
+  const { availability: _public, ...pack } = parsePack({ ...o, availability: null }, path);
+  return {
+    ...pack,
+    sortOrder: int(o, "sortOrder", path),
+    status: tag<ManagedPack["status"]>(o, "status", path),
+    availability: o.availability === null || o.availability === undefined ? null : parseManagedAvailability(o.availability, `${path}.availability`),
+    createdAt: date(o, "createdAt", path),
+    updatedAt: date(o, "updatedAt", path),
+  };
+}
+
+export function parseManagedCurrencies(value: unknown): ManagedCurrency[] {
+  return list(obj(value, "response"), "currencies", "response", parseManagedCurrency);
+}
+
+export function parseManagedItems(value: unknown): ManagedItem[] {
+  return list(obj(value, "response"), "items", "response", parseManagedItem);
+}
+
+export function parseManagedPacks(value: unknown): ManagedPack[] {
+  return list(obj(value, "response"), "packs", "response", parseManagedPack);
 }
