@@ -18,7 +18,7 @@ const UPDATE_FIELDS = {
   availability,
 };
 
-/** The packs of the game (currency bundles sold for real money). The catalog is shared by the `test` and `live` environments. */
+/** The packs of the game (currency bundles sold for real money). Each environment has its own catalog. */
 export class PacksResource {
   readonly #http: HttpClient;
 

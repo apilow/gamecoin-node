@@ -7,8 +7,7 @@ import { build, flag, listQuery, text } from "./catalog-body.js";
 const encode = (code: string) => `/currencies/${encodeURIComponent(requireString(code, "code"))}`;
 
 /**
- * The currencies of the game. The catalog is shared by the `test` and `live` environments: a currency created with a
- * test key exists for live keys too.
+ * The currencies of the game. Each environment has its own catalog: a currency created with a test key exists in `test` only.
  */
 export class CurrenciesResource {
   readonly #http: HttpClient;

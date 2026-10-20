@@ -41,7 +41,7 @@ export class GameCoin {
   /** The base URL in use, without a trailing slash and without `/api/v1`. */
   readonly baseUrl: string;
   readonly catalog: CatalogResource;
-  /** Manage the currencies, items and packs of the game (the catalog is shared by `test` and `live`). */
+  /** Manage the currencies, items and packs of the game (each environment has its own catalog: the key decides which one). */
   readonly currencies: CurrenciesResource;
   readonly items: ItemsResource;
   readonly packs: PacksResource;

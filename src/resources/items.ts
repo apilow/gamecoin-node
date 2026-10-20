@@ -15,7 +15,7 @@ const UPDATE_FIELDS = {
   metadata,
 };
 
-/** The items of the game (potions, skins…). The catalog is shared by the `test` and `live` environments. */
+/** The items of the game (potions, skins…). Each environment has its own catalog. */
 export class ItemsResource {
   readonly #http: HttpClient;
 
