@@ -4,7 +4,7 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/) (while the version is 0.x, a minor release may change the API).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-10-24
 
 Catalog management: create, change and archive currencies, items and packs.
 
