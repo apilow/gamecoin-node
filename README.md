@@ -1,7 +1,7 @@
 # @apilow/gamecoin
 
 Server SDK for [Apilow GameCoin](https://gamecoin.apilow.com), the bank of your game: it keeps the virtual currency,
-the inventory and the sales of your web or mobile game. Use it from your game backend, with a **secret key**.
+the inventory and the sales of your web or mobile game. Use it from your game backend, with a **secret key**. Full documentation: [gamecoin.apilow.com/docs/sdk/node](https://gamecoin.apilow.com/docs/sdk/node).
 
 - Whole server API: catalog, players, wallet, ledger, inventory, purchases, checkouts, gift codes, orders and refunds.
 - Catalog management, like the products and prices of a payment platform: create, change and archive currencies, items and packs.
@@ -101,7 +101,7 @@ In `players.upsert`, a missing field is left unchanged and `null` clears it.
 ## Wallet and ledger
 
 A balance has two buckets: `paid` (bought with real money) and `bonus` (granted or earned). A grant always credits
-`bonus`; a spend takes `bonus` first.
+`bonus`; by default a spend takes `bonus` first (a setting of the game can put `paid` first).
 
 ```js
 const wallet = await gamecoin.wallet.get(player);
@@ -228,7 +228,7 @@ with `error.details.fieldErrors.creatorCode` equal to `["CODE_INVALID"]`. The or
 `PACK_NOT_AVAILABLE` (`error.details.startsAt` and `error.details.endsAt`: ISO 8601 text or `null`), a pack with no unit left
 with `PACK_SOLD_OUT` (`error.details.packSku`). The window is checked when the order is created: an order created in time stays payable.
 
-In the test environment the payment page offers "Pay (simulated)" and "Decline"; real payments are not available yet.
+In the test environment the payment page offers "Pay (simulated)" and "Decline" and no money moves; with a live key the same call takes a real payment.
 After payment the order becomes `fulfilled`: the coins and items are delivered.
 
 `orders.refund` takes the coins and items back from a fulfilled order. An order that was never paid answers `CONFLICT`:
@@ -451,9 +451,8 @@ GAMECOIN_BASE_URL=http://localhost:3400 GAMECOIN_SECRET_KEY=gc_sk_test_... npm r
 
 ## Status
 
-Pre-release (`0.x`). The GameCoin API runs in **test mode with simulated payments**; real payments are not available
-yet, and the `live` environment is reserved for verified studios. The API of this package may still change between
-minor versions.
+Pre-release (`0.x`). The GameCoin API has a **test environment** (simulated payments) and a **live environment** (real
+payments), reserved for verified studios. The API of this package may still change between minor versions.
 
 ## Licence
 
